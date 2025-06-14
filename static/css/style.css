@@ -1,0 +1,145 @@
+/* Определение переменных цветовой схемы */
+:root {
+    --primary: #ff7043;        /* Основной цвет */
+    --primary-dark: #e64a19;   /* Тёмный вариант основного цвета */
+    --bg-dark: #121212;        /* Тёмный фон */
+    --bg-card: #1e1e1e;        /* Фон карточек */
+    --bg-surface: #2d2d2d;     /* Фон поверхностей */
+    --text-primary: #e0e0e0;   /* Основной цвет текста */
+    --text-secondary: #999;    /* Вторичный цвет текста */
+    --divider: #333;          /* Цвет разделителей */
+}
+
+/* Базовые стили */
+* {
+    box-sizing: border-box;
+    font-family: 'Roboto', Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+}
+
+/* Основной контейнер */
+body {
+    height: 100vh;
+    background-color: var(--bg-dark);
+    color: var(--text-primary);
+    display: flex;
+    overflow: hidden;
+}
+
+/* Стили бокового меню */
+.side-menu {
+    width: 280px;
+    background-color: var(--bg-card);
+    border-right: 1px solid var(--divider);
+    height: 100vh;
+    transition: transform 0.3s ease, width 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    z-index: 10;
+}
+
+/* Свёрнутое состояние бокового меню */
+.side-menu.collapsed {
+    width: 60px;
+}
+
+.side-menu.collapsed .menu-title,
+.side-menu.collapsed .menu-item span:not(.material-icons) {
+    display: none;
+}
+
+/* Заголовок меню */
+.menu-header {
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--divider);
+}
+
+/* Стили основной области чата */
+.main-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    position: relative;
+}
+
+/* Область сообщений */
+.chat-messages {
+    flex: 1;
+    padding: 16px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* Стили сообщений */
+.message {
+    max-width: 75%;
+    padding: 12px 16px;
+    border-radius: 8px;
+    word-wrap: break-word;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    position: relative;
+}
+
+/* Полученные сообщения */
+.received {
+    align-self: flex-start;
+    background-color: var(--bg-surface);
+    color: var(--text-primary);
+    border-top-left-radius: 4px;
+}
+
+/* Отправленные сообщения */
+.sent {
+    align-self: flex-end;
+    background-color: var(--primary);
+    color: white;
+    border-top-right-radius: 4px;
+}
+
+/* Область ввода сообщений */
+.chat-input-container {
+    padding: 12px;
+    background-color: var(--bg-card);
+    border-top: 1px solid var(--divider);
+    position: sticky;
+    bottom: 0;
+}
+
+/* Кастомный скроллбар */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--bg-surface);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--primary);
+    border-radius: 4px;
+}
+
+/* Медиа-запросы для адаптивности */
+@media (max-width: 768px) {
+    .side-menu {
+        position: absolute;
+        transform: translateX(-100%);
+    }
+    
+    .side-menu.open {
+        transform: translateX(0);
+    }
+    
+    .menu-toggle {
+        display: block;
+    }
+}
