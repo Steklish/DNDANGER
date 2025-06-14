@@ -2,6 +2,7 @@
 
 import os
 import json
+import time  # Add time module for performance measurements
 from typing import Type, TypeVar, Optional
 from pydantic import BaseModel, ValidationError
 import google.generativeai as genai
@@ -104,36 +105,55 @@ if __name__ == "__main__":
     load_dotenv()
     
     api_key = os.getenv("GOOGLE_API_KEY")
-    model_name = os.getenv("GEMINI_MODEL", "gemini-1.5-flash-latest")
+    model_name = os.getenv("GEMINI_MODEL_DUMB", "gemini-1.5-flash-latest")
     
     if not api_key:
         raise ValueError("GOOGLE_API_KEY not found. Please set it in your .env file.")
 
     generator = GeminiGenerator(api_key=api_key, model_name=model_name)
+    total_start_time = time.time()
+    generation_times = []
 
     try:
         # --- Example 1: Generate a RANDOM character in RUSSIAN ---
         print("\n==================\n[1] Generating a random character in Russian...")
+        start_time = time.time()
         random_russian_character = generator.generate(Character, language="Russian")
-        print("\n✅ Generated Random Russian Character:")
+        generation_time = time.time() - start_time
+        generation_times.append(("Random Russian Character", generation_time))
+        print(f"\n✅ Generated Random Russian Character (took {generation_time:.2f} seconds):")
         # IMPORTANT: Use ensure_ascii=False to print Cyrillic characters correctly.
         print(random_russian_character.model_dump_json(indent=2))
 
         # --- Example 2: Generate a SPECIFIC item in RUSSIAN ---
-        # For best results, provide the prompt in the target language as well.
         print("\n==================\n[2] Generating a specific item in Russian...")
+        start_time = time.time()
         item_prompt_ru = "Волшебный меч, который светится синим в присутствии орков"
         item_context_ru = "Выкован гномами в древней, забытой кузнице"
         russian_sword = generator.generate(Item, prompt=item_prompt_ru, context=item_context_ru, language="Russian")
-        print("\n✅ Generated Specific Russian Item:")
+        generation_time = time.time() - start_time
+        generation_times.append(("Specific Russian Item", generation_time))
+        print(f"\n✅ Generated Specific Russian Item (took {generation_time:.2f} seconds):")
         print(russian_sword.model_dump_json(indent=2))
         
         # --- Example 3: Generate a default (English) character for comparison ---
         print("\n==================\n[3] Generating a random character in English (default)...")
+        start_time = time.time()
         random_character = generator.generate(Character)
-        print("\n✅ Generated Random English Character:")
+        generation_time = time.time() - start_time
+        generation_times.append(("Random English Character", generation_time))
+        print(f"\n✅ Generated Random English Character (took {generation_time:.2f} seconds):")
         print(random_character.model_dump_json(indent=2))
 
+        # Print performance summary
+        total_time = time.time() - total_start_time
+        print("\n==================")
+        print("🕒 Performance Summary:")
+        print("------------------")
+        for name, duration in generation_times:
+            print(f"- {name}: {duration:.2f} seconds")
+        print(f"Total execution time: {total_time:.2f} seconds")
+        print("==================")
 
     except ValueError as e:
         print(f"\nAn error occurred during generation: {e}")
