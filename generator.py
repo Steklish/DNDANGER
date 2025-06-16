@@ -2,30 +2,40 @@
 
 import os
 import json
-import time  # Add time module for performance measurements
+import time
 from typing import Type, TypeVar, Optional
 from pydantic import BaseModel, ValidationError
 import google.generativeai as genai
 from dotenv import load_dotenv
+from global_defines import (
+    Colors, 
+    ERROR_COLOR, 
+    WARNING_COLOR, 
+    HEADER_COLOR,
+    ENTITY_COLOR,
+    SUCCESS_COLOR,
+    TIME_COLOR,
+    INFO_COLOR
+)
 
 # Import the self-contained schemas from our separate file
 # Make sure you have your schemas.py file in a 'models' subfolder or adjust the import.
-from models.schemas import Character, Item
+from models import *
 
 # A Generic Type Variable for our generator's return type
 T = TypeVar('T', bound=BaseModel)
 
-class GeminiGenerator:
+class ObjectGenerator:
     """
     A class to generate instances of Pydantic models in a specified language
     by instructing the Gemini API to return a JSON object.
     """
-    def __init__(self, api_key: str, model_name: str):
+    def __init__(self):
         """
         Initializes the generator with Google API credentials.
         """
-        genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel(model_name)
+        genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
+        self.model = genai.GenerativeModel(os.getenv("GEMINI_MODEL_DUMB", "gemini-2.0-flash-lite"))
 
     def _clean_json_response(self, text_response: str) -> str:
         """
@@ -85,7 +95,7 @@ class GeminiGenerator:
         IMPORTANT: Your response MUST be ONLY the valid JSON object that conforms to the schema. Do not include any other text, explanations, or markdown formatting like ```json.
         """
         
-        print(f"\n--- Sending request to Gemini for: {pydantic_model.__name__} (Language: {language or 'Default'}) ---")
+        print(f"\n{HEADER_COLOR}📡 Sending request to Gemini{Colors.RESET} for: {ENTITY_COLOR}{pydantic_model.__name__}{Colors.RESET} (Language: {INFO_COLOR}{language or 'Default'}{Colors.RESET})")
         response = self.model.generate_content(full_prompt)
 
         try:
@@ -94,66 +104,62 @@ class GeminiGenerator:
             return pydantic_model(**parsed_data)
 
         except (json.JSONDecodeError, ValidationError, ValueError) as e:
-            print(f"Error processing Gemini response: {e}")
-            print("--- Raw Response from API ---")
+            print(f"{ERROR_COLOR}❌ Error processing Gemini response:{Colors.RESET} {e}")
+            print(f"{WARNING_COLOR}Raw Response from API:{Colors.RESET}")
             print(response.text)
-            print("-----------------------------")
+            print(f"{Colors.DIM}{'─' * 30}{Colors.RESET}")
             raise ValueError("Failed to generate a valid Pydantic instance from the API's text response.")
 
-# --- Main execution block (Updated with Russian examples) ---
+# --- Main execution block (Updated with Russian examples and colorful output) ---
 if __name__ == "__main__":
     load_dotenv()
     
-    api_key = os.getenv("GOOGLE_API_KEY")
-    model_name = os.getenv("GEMINI_MODEL_DUMB", "gemini-1.5-flash-latest")
-    
-    if not api_key:
-        raise ValueError("GOOGLE_API_KEY not found. Please set it in your .env file.")
-
-    generator = GeminiGenerator(api_key=api_key, model_name=model_name)
+    generator = ObjectGenerator()
     total_start_time = time.time()
     generation_times = []
 
     try:
         # --- Example 1: Generate a RANDOM character in RUSSIAN ---
-        print("\n==================\n[1] Generating a random character in Russian...")
+        print(f"\n{HEADER_COLOR}{'=' * 20}{Colors.RESET}")
+        print(f"{HEADER_COLOR}[1] Generating a random character in Russian...{Colors.RESET}")
         start_time = time.time()
         random_russian_character = generator.generate(Character, language="Russian")
         generation_time = time.time() - start_time
         generation_times.append(("Random Russian Character", generation_time))
-        print(f"\n✅ Generated Random Russian Character (took {generation_time:.2f} seconds):")
-        # IMPORTANT: Use ensure_ascii=False to print Cyrillic characters correctly.
+        print(f"\n{SUCCESS_COLOR}✅ Generated Random Russian Character{Colors.RESET} ({TIME_COLOR}took {generation_time:.2f} seconds{Colors.RESET}):")
         print(random_russian_character.model_dump_json(indent=2))
 
         # --- Example 2: Generate a SPECIFIC item in RUSSIAN ---
-        print("\n==================\n[2] Generating a specific item in Russian...")
+        print(f"\n{HEADER_COLOR}{'=' * 20}{Colors.RESET}")
+        print(f"{HEADER_COLOR}[2] Generating a specific item in Russian...{Colors.RESET}")
         start_time = time.time()
         item_prompt_ru = "Волшебный меч, который светится синим в присутствии орков"
         item_context_ru = "Выкован гномами в древней, забытой кузнице"
         russian_sword = generator.generate(Item, prompt=item_prompt_ru, context=item_context_ru, language="Russian")
         generation_time = time.time() - start_time
         generation_times.append(("Specific Russian Item", generation_time))
-        print(f"\n✅ Generated Specific Russian Item (took {generation_time:.2f} seconds):")
+        print(f"\n{SUCCESS_COLOR}✅ Generated Specific Russian Item{Colors.RESET} ({TIME_COLOR}took {generation_time:.2f} seconds{Colors.RESET}):")
         print(russian_sword.model_dump_json(indent=2))
         
-        # --- Example 3: Generate a default (English) character for comparison ---
-        print("\n==================\n[3] Generating a random character in English (default)...")
+        # --- Example 3: Generate a random scene ---
+        print(f"\n{HEADER_COLOR}{'=' * 20}{Colors.RESET}")
+        print(f"{HEADER_COLOR}[3] Generating a random scene...{Colors.RESET}")
         start_time = time.time()
-        random_character = generator.generate(Character)
+        random_scene = generator.generate(Scene, language="Russian")
         generation_time = time.time() - start_time
-        generation_times.append(("Random English Character", generation_time))
-        print(f"\n✅ Generated Random English Character (took {generation_time:.2f} seconds):")
-        print(random_character.model_dump_json(indent=2))
+        generation_times.append(("Random Scene in Russian", generation_time))
+        print(f"\n{SUCCESS_COLOR}✅ Generated Random Scene in Russian{Colors.RESET} ({TIME_COLOR}took {generation_time:.2f} seconds{Colors.RESET}):")
+        print(random_scene.model_dump_json(indent=2))
 
         # Print performance summary
         total_time = time.time() - total_start_time
-        print("\n==================")
-        print("🕒 Performance Summary:")
-        print("------------------")
+        print(f"\n{HEADER_COLOR}{'=' * 20}{Colors.RESET}")
+        print(f"{HEADER_COLOR}🕒 Performance Summary:{Colors.RESET}")
+        print(f"{Colors.DIM}{'─' * 20}{Colors.RESET}")
         for name, duration in generation_times:
-            print(f"- {name}: {duration:.2f} seconds")
-        print(f"Total execution time: {total_time:.2f} seconds")
-        print("==================")
+            print(f"{INFO_COLOR}▸ {name}:{Colors.RESET} {TIME_COLOR}{duration:.2f} seconds{Colors.RESET}")
+        print(f"{HEADER_COLOR}Total execution time:{Colors.RESET} {TIME_COLOR}{total_time:.2f} seconds{Colors.RESET}")
+        print(f"{HEADER_COLOR}{'=' * 20}{Colors.RESET}")
 
     except ValueError as e:
-        print(f"\nAn error occurred during generation: {e}")
+        print(f"\n{ERROR_COLOR}❌ An error occurred during generation:{Colors.RESET} {e}")

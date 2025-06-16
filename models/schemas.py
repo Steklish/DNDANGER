@@ -73,3 +73,24 @@ class Character(BaseModel):
     abilities: List[Ability] = Field(default_factory=list, description="Список особых способностей персонажа.")
     
     personality_history: str = Field(description="Подробное описание личности, предыстории и мотивации персонажа.")
+    
+
+class SceneObject(BaseModel):
+    """
+    Pydantic schema for a general object within a scene, like a door, tree, or statue.
+    This is for background elements that characters might interact with.
+    """
+    name: str = Field(description="The short, identifiable name of the object (e.g., 'Large Oak Door', 'Ancient Weeping Willow').")
+    description: str = Field(description="A detailed visual and sensory description of the object. What does it look, feel, or smell like?")
+    size_description: str = Field(description="A descriptive account of the object's size and scale (e.g., 'roughly 3 feet wide and 7 feet tall', 'towers over the clearing').")
+    position_in_scene: str = Field(description="A description of where the object is located within the scene (e.g., 'against the north wall', 'in the center of the room').")
+    interactions: List[str] = Field(default_factory=list, description="A list of possible simple interactions with the object (e.g., ['Open', 'Close', 'Lock'], ['Examine', 'Touch']). Empty if not interactive.")
+
+class Scene(BaseModel):
+    """
+    Pydantic schema for describing a game environment or location.
+    """
+    name: str = Field(description="A short, evocative title for the scene (e.g., 'The Abandoned Library', 'Goblin Ambush Site').")
+    description: str = Field(description="A detailed overview of the scene, including lighting, atmosphere, sounds, and smells. This sets the mood.")
+    size_description: str = Field(description="A description of the scene's overall dimensions and scale (e.g., 'a cramped 15x15 foot stone chamber', 'a vast, open field stretching to the horizon').")
+    objects: List[SceneObject] = Field(default_factory=list, description="A list of all the notable objects present in the scene, each as a full SceneObject.")
