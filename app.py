@@ -8,7 +8,7 @@ app = Flask(__name__)
 @app.route('/')
 def index():
     # Отображаем шаблон index.html
-    return render_template('index.html')
+    return render_template('player.html')
 
 # Запускаем приложение в режиме отладки, если файл запущен напрямую
 if __name__ == '__main__':

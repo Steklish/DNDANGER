@@ -1,4 +1,7 @@
+import random
 from dotenv import load_dotenv
+from numpy import character
+from pyparsing import Char
 from classifier import Classifier
 from generator import ObjectGenerator
 from models import *
@@ -11,7 +14,8 @@ from global_defines import (
     ENTITY_COLOR,
     SUCCESS_COLOR,
     TIME_COLOR,
-    INFO_COLOR
+    INFO_COLOR,
+    MAX_CONTEXT_LENGTH
 )
 import global_defines
 from models import *
@@ -20,6 +24,18 @@ from models import *
 
 class ChapterLogicFight:
     """Fight logic for a chapter in a game, handling character interactions and actions."""
+
+    
+    def __init__(self, context: str, characters: List[Character] = [], language: str = "Russian"):
+        self.context = context
+        self.last_scene = context
+        self.characters = characters        
+        self.generator = ObjectGenerator()
+        self.scene = None
+        self.classifier = Classifier()
+        self.language = language
+        self.turn_order = [char.name for char in self.characters]
+        self.current_turn = 0
     
     def update_scene(self, scene_name: str, changes_to_make: str):
         """
@@ -77,16 +93,6 @@ class ChapterLogicFight:
         except Exception as e:
             print(f"{ERROR_COLOR}❌ Error updating character: {e}{Colors.RESET}")
             return
-
-    
-    def __init__(self, context: str, characters: List[Character] = [], language: str = "Russian"):
-        self.context = context
-        self.last_scene = context
-        self.characters = characters        
-        self.generator = ObjectGenerator()
-        self.scene = None
-        self.classifier = Classifier()
-        self.language = language
         
 
     def setup_fight(self):
@@ -94,6 +100,8 @@ class ChapterLogicFight:
         Initializes the fight by generating objects and their actions based on the context.
         """
         print(f"\n{HEADER_COLOR}🎲 Generating Scene...{Colors.RESET}")
+        
+        # scene context is the same one as the chapter context (context at creating the chapter)
         scene_d = self.classifier.generate(
             f"Generate a scene description and difficulty based on the context: {self.context}",
             NextScene
@@ -109,23 +117,46 @@ class ChapterLogicFight:
         print(f"\n{SUCCESS_COLOR}✨ Generated Scene:{Colors.RESET} {ENTITY_COLOR}{self.scene.name}{Colors.RESET}")
         print(f"{INFO_COLOR}📜 Description:{Colors.RESET} {self.scene.description}")
 
+
+        # Here i remove unnecessary parts from the context to reduce memory usage
         self.context = self.classifier.general_text_llm_request(
-        """
-        based on the global context, extract only the details that matter for the next scene. If no characters provided, dont make them up. If some info is missing you are allowed to create it. Dont ask additional information.
-        in no context provided at all come up with something like "evry memory have faded away and the past seems very blury"
+        f"""
+            Provide the details that matter for the next scene. 
+            If some info is missing you are allowed to create it. 
+            Dont ask additional information.
+            in no context provided at all come up with something like "evry memory have faded away and the past seems very blury". 
+            Dont generate additional text, only story extract for the current scene.
+            Current context:
+            {self.context}
         """
         )
+        
+        self.turn_order = [char.name for char in self.characters]
+        self.turn_order = random.shuffle(self.turn_order)
+        print(f"{INFO_COLOR}Turn order shuffled{Colors.RESET}")
         
         print(f"\n{HEADER_COLOR}Current Scene:{Colors.RESET}")
         print(f"{INFO_COLOR}{str(self.scene)}{Colors.RESET}")
         print(f"\n{HEADER_COLOR}Current Context:{Colors.RESET}")
         print(f"{INFO_COLOR}{str(self.context)}{Colors.RESET}")
         
+    def move_to_next_turn(self):
+        self.current_turn = (self.current_turn + 1) % len(self.turn_order) # type: ignore
+
+    def get_active_character_name(self) -> str:
+        return self.turn_order[self.current_turn] # type: ignore
+
+    def get_active_character(self) -> Character: # type: ignore
+        for character in self.characters:
+            if character.name == self.get_active_character_name():
+                return character
 
     def get_actual_context(self) -> str:
         return f"""
     <story and situation>
     {self.context}
+    <characters>
+    {str(self.characters)}
     <scene>
     {str(self.scene)}
     """
@@ -142,11 +173,10 @@ class ChapterLogicFight:
         {global_defines.dungeon_master_core_prompt}
         
         Ты Мастер D&D. Определи исход действия. Используй HTML-теги: 
-        тег для урона <span class="damage">урон</span>, 
-        тег для исцеления <span class="heal">исцеление</span>, 
-        тег для состояния <span class="condition">состояние</span>, 
-        тег для имени <span class="name">Имя</span>.
-        НЕ используй MarkDown теги
+        тег для слов или отвков текста, которые описывают урон <span class="damage">урон</span>, 
+        тег для слов или отвков текста, которые описывают исцеление <span class="heal">исцеление</span>, 
+        тег для слов или отвков текста, которые описывают состояния <span class="condition">состояние</span>, 
+        тег для имён <span class="name">Имя</span>.
         Следи за тем, чтобы действия были логически обоснованы, особенно если действующее лицо - это игрок.
 
         Контекст:
@@ -154,6 +184,7 @@ class ChapterLogicFight:
         Действие для {character.name}: {action}
         """
         reply = self.classifier.general_text_llm_request(prompt)
+        self.context += f"\n\n{character.name} performs action (DM's response): {reply}" # type: ignore
         self.apply_changes_after_turn(reply, character) # type: ignore
         return reply
     
@@ -184,8 +215,7 @@ class ChapterLogicFight:
                     )
             elif change.object_type == "scene":
                 self.update_scene(change.object_name, change.changes)
-            else:
-                self.context += str(change) # type: ignore
+            self.context += str(change) # type: ignore
         print("ALl the changes applied successfully")
         
     def askedDM(self, character: Character, question: str):
@@ -204,10 +234,19 @@ class ChapterLogicFight:
         Вопрос: "{question}"
         """
         reply = self.classifier.general_text_llm_request(prompt)
-        self.context =  str(self.context) + f"\n\n{character.name} asks: {question}"
+        self.context =  str(self.context) + f"\n\nPlayer that controlls {character.name} asks: {question}"
         self.context += f"\n\nDM's response: {reply}"
         print(f"{SUCCESS_COLOR}🎲 DM's response:{Colors.RESET} {reply}")
         return reply
+
+    def trim_context(self):
+        self.context = self.classifier.general_text_llm_request(
+            f"""
+                Make this actions log about {MAX_CONTEXT_LENGTH} words long.
+                Dont miss important details even if they are not directly related to the current scene or if they are in the past.
+            """
+        )
+        
 
     def process_interaction(self, character: Character, interaction: str):
         """
@@ -282,7 +321,7 @@ if __name__ == "__main__":
     print(r_ch.model_dump_json(indent=2))
     chapter.characters.append(r_ch)
     print(chapter.scene.model_dump_json(indent=2)) # type: ignore
-    # chapter.update_scene(chapter.scene.name, "заставь все гореть в пожаре") # type: ignore
-    # print(chapter.scene.model_dump_json(indent=2)) # type: ignore
+    chapter.update_scene(chapter.scene.name, "заставь все гореть в пожаре") # type: ignore
+    print(chapter.scene.model_dump_json(indent=2)) # type: ignore
     hhh = input("enter a question to a DM...    ")
     print(chapter.process_interaction(chapter.characters[0], hhh)) # type: ignore

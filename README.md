@@ -105,3 +105,74 @@ python classifier.py
 ## Отказ от ответственности
 
 Этот проект является фанатским инструментом и не связан с Wizards of the Coast или официальной франшизой D&D. Весь контент, связанный с D&D, используется в соответствии с принципами добросовестного использования в образовательных и развлекательных целях.
+
+
+### EVENTS
+
+- keepalive
+   - `pohui`
+- lock/unlock message
+      
+   ```
+   {
+      event : lock 
+      allowed_players : [  // имя игрока который сейчас ходит.
+         player_name1
+         player_name
+         ]   
+   }
+   ```
+- other player's message
+   ```
+   {
+      event : other_player_message 
+      data : text
+      sender : character_name
+   }
+   ```
+- state_update_required
+   ```
+   {
+      event : some_stat_update
+      total: n
+      current: c
+   }
+   ```  
+
+### REQUESTS
+
+- full update - `GET`
+   `/refresh - выдавать всю инфу про главу`
+- interaction
+   `/interaction - POST`
+
+# пример работы со стримом `JS`
+```js
+// 1. Create a new EventSource object to connect to our /stream endpoint
+const eventSource = new EventSource("/stream");
+
+// 2. Listen for the 'message' event from the server
+eventSource.onmessage = function(event) {
+   const data = JSON.parse(event.data);
+   console.log(data);
+};
+```
+# пример работы со стримом `Python`
+```python
+data_dict = {
+	'value': random.randint(1, 100),
+	'user': random.choice(['Alice', 'Bob', 'Charlie']),
+	'timestamp': time.strftime('%H:%M:%S'),
+	'isValid': random.choice([True, False])
+}
+# 2. Convert the dictionary to a JSON string
+json_data = json.dumps(data_dict)
+
+# 3. Format it as an SSE message
+#    The 'data:' prefix is required, followed by the JSON string.
+#    The two newlines ('\n\n') signal the end of the event.
+sse_message = f"data: {json_data}\n\n"
+
+# 4. Yield the message to the client
+yield sse_message
+```

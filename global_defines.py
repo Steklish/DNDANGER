@@ -54,6 +54,10 @@ HEADER_COLOR = Colors.BOLD + Colors.MAGENTA
 ENTITY_COLOR = Colors.CYAN
 TIME_COLOR = Colors.DIM + Colors.BRIGHT_WHITE
 
+
+# context length limits for a scene
+MAX_CONTEXT_LENGTH = 1100
+
 dungeon_master_core_prompt = """
 ### Dungeon Master Core Prompt
 You are an expert Dungeon Master (DM) for text-based roleplaying games. Your goal is to create a fun, immersive, and seamless TTRPG experience.

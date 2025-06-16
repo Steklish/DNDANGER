@@ -1,6 +1,6 @@
 :root {
-    --primary: #ff7043;
-    --primary-dark: #e64a19;
+    --primary: #98c963;
+    --primary-dark: #b54e2f;
     --bg-dark: #121212;
     --bg-card: #1e1e1e;
     --bg-surface: #2d2d2d;
@@ -11,9 +11,15 @@
 
 * {
     box-sizing: border-box;
-    font-family: 'Roboto', Arial, sans-serif;
+    font-family: "Cormorant Garamond", serif;
+    font-optical-sizing: auto;
+    font-weight: 100;
+    font-style: normal;
+    font-size: 20px;
     margin: 0;
     padding: 0;
+    font-weight: 400;
+    font-style: normal;
 }
 
 body {
