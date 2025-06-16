@@ -2,93 +2,29 @@
 
 A sophisticated AI-powered Dungeon Master assistant for D&D campaigns, leveraging Python, Flask, and Google's Gemini AI to create immersive storytelling experiences.
 
-## Key Features
-
-- Dynamic scene generation and storytelling with context awareness
-- AI-driven Dungeon Master responses with personality and consistency
-- Smart context tracking and scene management
-- Natural language processing for player actions and requests
-- Real-time interactive chat interface with Material Design
-- Multi-character support with NPC interaction capabilities
-- Automated dice rolling and combat management
-
 ## Установка
-
-1. Клонируйте репозиторий:
-```bash
-git clone https://github.com/yourusername/dnd-born-in-pain.git
-cd dnd-born-in-pain
-```
-
-2. Настройте окружение:
-```bash
-# Создайте и активируйте виртуальное окружение
-python -m venv env
-source env/bin/activate  # Для Windows: env\Scripts\activate
-
-# Установите зависимости
-pip install -r requirements.txt
-```
-
-3. Настройте переменные окружения:
+1. Настройте переменные окружения:
 ```bash
 # Скопируйте пример файла окружения
 cp .env.example .env
 ```
 
-4. Настройте учетные данные Google AI:
+2. Настройте учетные данные Google AI:
    - Получите API-ключ Google в Google Cloud Console
    - Добавьте ваш API-ключ в файл .env:
      ```
      GOOGLE_API_KEY="ваш-api-ключ"
-     FLASK_SECRET_KEY="ваш-секретный-ключ"
      GEMINI_MODEL_DUMB="gemini-2.0-flash-lite"
      ```
 
 ## Использование
 
-1. Запустите приложение:
+### Запуск приложения:
 ```bash
 python app.py
 ```
 
-2. Откройте `http://localhost:5000` в вашем браузере для доступа к веб-интерфейсу
-
-3. Основные компоненты:
-   - `app.py` - Точка входа веб-приложения Flask
-   - `chapter_logic.py` - Основная игровая логика и управление сценами
-   - `classifier.py` - ИИ-классификация текста с использованием Gemini
-   - `generator.py` - Генерация сцен и объектов с помощью Gemini
-   - `models/` - Pydantic-модели для игровых сущностей
-   - `static/` - Ресурсы веб-интерфейса
-   - `templates/` - HTML-шаблоны
-
 ## Технические детали
-
-### Архитектура
-- Веб-фреймворк Flask для бэкенда
-- Google Gemini AI для обработки естественного языка
-- Pydantic для валидации данных и управления схемами
-- Адаптивный веб-интерфейс на основе Material Design
-
-### Ключевые классы
-- `ChapterLogicFight`: Управляет игровыми сценами и боевыми столкновениями
-- `Classifier`: Обрабатывает ИИ-классификацию текста
-- `ObjectGenerator`: Генерирует игровые объекты и сцены
-- `Character`, `Scene`, `Item`: Основные модели игровых сущностей
-
-## Разработка
-
-### Требования
-- Python 3.8 или выше
-- API-ключ Google с доступом к моделям Gemini
-- Базовое понимание механик D&D
-
-### Тестирование
-Запустите тесты классификатора:
-```bash
-python classifier.py
-```
 
 ## Участие в разработке
 
@@ -98,28 +34,24 @@ python classifier.py
 4. Отправьте изменения в репозиторий (`git push origin feature/amazing-feature`)
 5. Откройте Pull Request
 
-## Лицензия
-
-Этот проект распространяется под лицензией MIT - подробности см. в файле LICENSE.
-
-## Отказ от ответственности
-
-Этот проект является фанатским инструментом и не связан с Wizards of the Coast или официальной франшизой D&D. Весь контент, связанный с D&D, используется в соответствии с принципами добросовестного использования в образовательных и развлекательных целях.
-
 
 ### EVENTS
 
 - keepalive
-   - `pohui`
+   ```
+   {
+      data : any
+   }
+   ```
 - lock/unlock message
       
    ```
    {
       event : lock 
       allowed_players : [  // имя игрока который сейчас ходит.
-         player_name1
-         player_name
-         ]   
+         player_name_1
+         player_name_2
+      ]   
    }
    ```
 - other player's message
@@ -142,7 +74,28 @@ python classifier.py
 ### REQUESTS
 
 - full update - `GET`
-   `/refresh - выдавать всю инфу про главу`
+   - `/refresh - выдавать всю инфу про главу`
+      - (см. описание классов в ./models/schemas.py)
+         ```
+         {
+            scene : sceneOBJ,
+            players : [
+               playerObj_1,
+               playerObj_1
+            ],
+            schat_history : [
+               {
+                  message_text : "asdsad",
+                  sender_name : "yyy"
+               },
+               {
+                  message_text : "fhcghj,bbbhb",
+                  sender_name : "xxx"
+               }
+            ]
+         }
+         ```
+
 - interaction
    `/interaction - POST`
 
@@ -176,3 +129,22 @@ sse_message = f"data: {json_data}\n\n"
 # 4. Yield the message to the client
 yield sse_message
 ```
+
+
+# ВАЖНО
+
+### Web-чвсть
+
+- `login.html`
+   - тут выюор персонажа (возможно, создание)
+   - тут же выбор того, зайдешь ли как игрок или как доска админа
+- `player.html`
+   - тут мменюшка игрока
+      - чат с событиями
+      - боковая панель со статами / инвентарем / описаниями
+- `observer.html`
+   - тут общая менюшка
+      - кто сейчас ходит (включая врагов)
+      - статы для всех дейстыующих лиц
+      - состояние сцены (м б какая-то визуализация)
+
