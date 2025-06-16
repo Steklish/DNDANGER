@@ -2,6 +2,7 @@ from dotenv import load_dotenv
 from classifier import Classifier
 from generator import ObjectGenerator
 from models import *
+from utils import *
 from global_defines import (
     Colors, 
     ERROR_COLOR, 
@@ -13,9 +14,71 @@ from global_defines import (
     INFO_COLOR
 )
 import global_defines
+from models import *
+
+
 
 class ChapterLogicFight:
     """Fight logic for a chapter in a game, handling character interactions and actions."""
+    
+    def update_scene(self, scene_name: str, changes_to_make: str):
+        """
+        Updates the current scene with the provided changes.
+        
+        :param scene_name: The name of the scene to update.
+        :param changes_to_make: A string describing the changes to apply.
+        """
+        print(f"\n{ENTITY_COLOR}{scene_name}{Colors.RESET} {INFO_COLOR}updates attributes with:{Colors.RESET} {changes_to_make}")
+        try:
+            self.scene = self.generator.generate(
+                pydantic_model=Scene,
+                prompt=f"""
+                Make following changes to the scene:
+                {str(self.scene)}
+                Changes to make: {changes_to_make}
+                """,
+                language=self.language
+            )
+            print(f"{SUCCESS_COLOR}✨ Scene updated successfully!{Colors.RESET}")
+        except Exception as e:
+            print(f"{ERROR_COLOR}❌ Error updating scene: {e}{Colors.RESET}")
+            return
+    
+    def update_character(self, character_name: str, changes_to_make: str):
+        """
+        Updates a character's attributes based on the provided changes.
+        
+        :param character_name: The name of the character to update.
+        :param changes_to_make: A string describing the changes to apply.
+        """
+        print(f"\n{ENTITY_COLOR}{character_name}{Colors.RESET} {INFO_COLOR}updates attributes with:{Colors.RESET} {changes_to_make}")
+        try:        
+            char_name_list = [char.name for char in self.characters]
+            
+            char_dict = {char.name: char for char in self.characters}
+            
+            character = char_dict.get(find_closest_match(character_name, char_name_list))
+
+            if character:
+                self.characters.remove(character) # type: ignore
+            character = self.generator.generate(
+                pydantic_model=Character,
+                prompt=f"""
+                Make following changes to the character:
+                {str(character)}
+                Changes to make: {changes_to_make}
+                
+                IMPORTANT: every change has to be reflected in character. If it is a significant modification it can be reflected in character's personality.
+                """,
+                language=self.language
+            )
+            self.characters.append(character) # type: ignore
+            print(f"{SUCCESS_COLOR}✨ Character updated successfully!{Colors.RESET}")
+        except Exception as e:
+            print(f"{ERROR_COLOR}❌ Error updating character: {e}{Colors.RESET}")
+            return
+
+    
     def __init__(self, context: str, characters: List[Character] = [], language: str = "Russian"):
         self.context = context
         self.last_scene = context
@@ -47,7 +110,9 @@ class ChapterLogicFight:
         print(f"{INFO_COLOR}📜 Description:{Colors.RESET} {self.scene.description}")
 
         self.context = self.classifier.general_text_llm_request(
-        """based on the global context, extract only the details that matter for the next scene. If no characters provided, dont make them up. If some info is missing you are allowed to create it. Dont ask additional information.
+        """
+        based on the global context, extract only the details that matter for the next scene. If no characters provided, dont make them up. If some info is missing you are allowed to create it. Dont ask additional information.
+        in no context provided at all come up with something like "evry memory have faded away and the past seems very blury"
         """
         )
         
@@ -76,15 +141,52 @@ class ChapterLogicFight:
         prompt = f"""
         {global_defines.dungeon_master_core_prompt}
         
-        Ты Мастер D&D. Определи исход действия. Твой ответ ДОЛЖЕН быть валидным JSON.
-        КЛЮЧЕВОЕ ПРАВИЛО: Ты ОБЯЗАН вернуть массив "effects", даже если он пустой ([]).
-        В "description" используй HTML-теги: <span class="damage">урон</span>, <span class="heal">исцеление</span>, <span class="condition">состояние</span>, <span class="name">Имя</span>.
+        Ты Мастер D&D. Определи исход действия. Используй HTML-теги: 
+        тег для урона <span class="damage">урон</span>, 
+        тег для исцеления <span class="heal">исцеление</span>, 
+        тег для состояния <span class="condition">состояние</span>, 
+        тег для имени <span class="name">Имя</span>.
+        НЕ используй MarkDown теги
+        Следи за тем, чтобы действия были логически обоснованы, особенно если действующее лицо - это игрок.
 
         Контекст:
-        
+        {self.get_actual_context()}
         Действие для {character.name}: {action}
         """
-        
+        reply = self.classifier.general_text_llm_request(prompt)
+        self.apply_changes_after_turn(reply, character) # type: ignore
+        return reply
+    
+    def apply_changes_after_turn(self, action_description : str, character : Character):
+        """
+        Applies changes after action was preformed.
+        """
+        changes : list[ChangesToMake] = self.classifier.generate_list(
+            contents=f"""
+            Action by character: {character.name}
+            
+            Outcome description:
+            {action_description}
+            
+            
+            Important: if for example a character took their sword and left it in the middle of the road it should be a change for the charactera and a cahnge for the scene as well.
+            Example: if a character lightens up a bonfire you shoud come up with something like "LIght up a bonfire" - where object type is scene.
+            """,
+            pydantic_model=ChangesToMake
+        ) # type: ignore
+
+        for change in changes: # type: ignore
+            # Apply each change to the character/scene
+            if change.object_type == "character":
+                self.update_character(
+                    character_name=change.object_name,
+                    changes_to_make=change.changes
+                    )
+            elif change.object_type == "scene":
+                self.update_scene(change.object_name, change.changes)
+            else:
+                self.context += str(change) # type: ignore
+        print("ALl the changes applied successfully")
         
     def askedDM(self, character: Character, question: str):
         """
@@ -96,7 +198,7 @@ class ChapterLogicFight:
         print(f"\n{ENTITY_COLOR}{character.name}{Colors.RESET} {INFO_COLOR}asks:{Colors.RESET} {question}")
         prompt = f"""
         {global_defines.dungeon_master_core_prompt}
-        Ответь на вопрос, выделяя <span class='keyword'>ключевые слова</span>.
+        Ответь на вопрос, выделяя ключевые слова тегом <span class='keyword'>ключевые слова</span> и выделяя имена тегом <span class='name'>имена</span> . НЕ используй MarkDown теги.
         Контекст:
         {self.get_actual_context()}
         Вопрос: "{question}"
@@ -111,7 +213,7 @@ class ChapterLogicFight:
         """
         Processes a character's interaction, deciding the outcome of actions and questions.
         """
-        decision = self.classifier.generate(
+        decision : ClassifyInformationOrActionRequest = self.classifier.generate(
             contents=f"""
             context:
             {self.context}
@@ -121,15 +223,18 @@ class ChapterLogicFight:
             {interaction}
             """, 
             pydantic_model=ClassifyInformationOrActionRequest
-        )
+        )  # type: ignore
         
-        interaction += decision["reasoning"] # type: ignore
-        
-        if decision["decision"]: # type: ignore
-            self.askedDM(character, interaction)
+        interaction += decision.reasoning # type: ignore
+        result = None
+        if decision.decision: # type: ignore
+            print(f"{INFO_COLOR}Request for info {Colors.RESET}")
+            result = self.askedDM(character, interaction)
         else:
-            self.action(character, interaction)
-
+            print(f"{INFO_COLOR}Request for action {Colors.RESET}")
+            result = self.action(character, interaction)
+        return result
+    
     def start_turn_loop(self):
         """
         Starts the turn loop for the fight, allowing characters to take actions.
@@ -158,7 +263,26 @@ class ChapterLogicFight:
 
 if __name__ == "__main__":
     load_dotenv()
+
+    # character damage test
+    # print(f"{HEADER_COLOR}🎮 Starting new chapter...{Colors.RESET}")
+    # chapter = ChapterLogicFight(context = "the journey begins...")
+    # chapter.setup_fight()
+    # r_ch = chapter.generator.generate(Character, "random character with full hp and no items in inventory", "no context", "Russian")
+    # print(r_ch.model_dump_json(indent=2))
+    # chapter.characters.append(r_ch)
+    # chapter.update_character(r_ch.name, "получил 10 урона и потерял глаз")
+    # print(chapter.characters[0].model_dump_json(indent=2))
     
+    # scene change test
     print(f"{HEADER_COLOR}🎮 Starting new chapter...{Colors.RESET}")
     chapter = ChapterLogicFight(context = "the journey begins...")
     chapter.setup_fight()
+    r_ch = chapter.generator.generate(Character, "random character with full hp and no items in inventory", "no context", "Russian")
+    print(r_ch.model_dump_json(indent=2))
+    chapter.characters.append(r_ch)
+    print(chapter.scene.model_dump_json(indent=2)) # type: ignore
+    # chapter.update_scene(chapter.scene.name, "заставь все гореть в пожаре") # type: ignore
+    # print(chapter.scene.model_dump_json(indent=2)) # type: ignore
+    hhh = input("enter a question to a DM...    ")
+    print(chapter.process_interaction(chapter.characters[0], hhh)) # type: ignore

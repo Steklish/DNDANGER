@@ -1,5 +1,5 @@
-# Этот файл делает директорию 'models' Python-пакетом
-# Импортируем основные классы для удобного доступа из других модулей
+# This file makes the 'models' directory a Python package
+# Import core classes for convenient access from other modules
 from .schemas import *
 from .reuqest_types import *
 import pkgutil
