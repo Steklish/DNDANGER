@@ -2,7 +2,7 @@
 
 from enum import Enum
 from pydantic import BaseModel, Field
-from typing import List, Set, Dict, Any, Optional
+from typing import List, Dict, Any, Optional
 
 # --- Перечисления и другие классы (Item, Ability) остаются без изменений ---
 # (Они включены здесь для полноты файла)
@@ -64,9 +64,9 @@ class Character(BaseModel):
     current_hp: int = Field(description="Текущее количество очков здоровья персонажа.")
     ac: int = Field(description="Класс брони персонажа, представляющий его защиту.")
     is_player: bool = Field(default=False, description="True, если это игровой персонаж.")
-    
-    conditions: Set[str] = Field(default_factory=set, description="Набор текущих состояний, влияющих на персонажа.")
-    
+
+    conditions: List[str] = Field(default_factory=list, description="Набор текущих состояний, влияющих на персонажа.")
+
     # === ЭТО ИЗМЕНЕННАЯ СТРОКА ===
     inventory: List[Item] = Field(default_factory=list, description="Список предметов персонажа.")
     

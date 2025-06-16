@@ -79,7 +79,7 @@ python app.py
          ```
          {
             scene : sceneOBJ,
-            players : [
+            characters : [
                playerObj_1,
                playerObj_1
             ],
