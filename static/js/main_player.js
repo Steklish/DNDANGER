@@ -8,6 +8,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const menuOpen = document.getElementById('menuOpen');
     const menuClose = document.getElementById('menuClose');
     const menuItems = document.querySelectorAll('.menu-item');
+    const character_name = document.getElementById('character_name').innerHTML
 
     // Получаем имя игрока из localStorage (установленное при логине)
     const currentPlayerName = localStorage.getItem('playerName');
@@ -22,7 +23,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Функция обновления данных
     function fetchUpdates() {
-        fetch('http://127.0.0.1:5000/refresh')
+        fetch('/refresh')
             .then(response => response.json())
             .then(data => {
                 try {
@@ -132,6 +133,55 @@ document.addEventListener('DOMContentLoaded', function() {
             });
     }
 
+    function addMessage(messageText, senderName) {
+        let new_message = ''
+        if (senderName == character_name){
+            new_message = `
+                <div class="message sent">
+                    <div class="sender-name">${senderName}</div>
+                    <div class="message-text">
+                    ${marked.parse(messageText.trimStart())}
+                    </div>
+                </div>
+                `
+        }
+        else{
+            new_message = `
+                <div class="message received">
+                    <div class="sender-name">${senderName}</div>
+                    <div class="message-text">
+                    ${marked.parse(messageText.trimStart())}
+                    </div>
+                </div>
+                `
+        }
+            // console.log(messageText)
+        chatMessages.innerHTML += new_message
+        return
+    }
+
+    function send_interaction_request(text){
+        fetch('/interact', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(
+                {
+                    "character" : character_name,
+                    "message" : text 
+                }
+            )
+        })
+        .then(response => response.json())
+        .then(data => {
+            // Optionally handle response data here
+            console.log('Interaction response:', data);
+        })
+        .catch(error => {
+            console.error('Ошибка при отправке запроса взаимодействия:', error);
+        });
+    }
     // Функция обновления чата
     function updateChat(messages) {
         if (!chatMessages) return;
@@ -140,38 +190,23 @@ document.addEventListener('DOMContentLoaded', function() {
         messages.forEach(message => {
             const senderName = message.sender_name;
             const messageText = message.message_text;
-            
-            const messageDiv = document.createElement('div');
-            messageDiv.classList.add('message');
-            messageDiv.classList.add(senderName.toLowerCase() === currentPlayerName.toLowerCase() ? 'sent' : 'received');
-            
-            const senderDiv = document.createElement('div');
-            senderDiv.classList.add('sender-name');
-            senderDiv.textContent = senderName;
-            
-            const textDiv = document.createElement('div');
-            textDiv.classList.add('message-text');
-            textDiv.innerHTML = parseMarkdownAndHTML(messageText);
-            
-            messageDiv.appendChild(senderDiv);
-            messageDiv.appendChild(textDiv);
-            
-            chatMessages.appendChild(messageDiv);
+            addMessage(messageText, senderName)
         });
         
         // Прокручиваем к последнему сообщению
         chatMessages.scrollTop = chatMessages.scrollHeight;
 
         // Обновляем боковую историю чата
-        const chatHistorySidebar = document.getElementById('chatHistory');
-        if (chatHistorySidebar) {
-            chatHistorySidebar.innerHTML = messages.map(message => `
-                <div class="chat-history-item">
-                    <strong>${message.sender_name}</strong>
-                    <p>${parseMarkdownAndHTML(message.message_text)}</p>
-                </div>
-            `).join('');
-        }
+        // ! это не используется сейчас но фича норм
+        // const chatHistorySidebar = document.getElementById('chatHistory');
+        // if (chatHistorySidebar) {
+        //     chatHistorySidebar.innerHTML = messages.map(message => `
+        //         <div class="chat-history-item">
+        //             <strong>${message.sender_name}</strong>
+        //             <p>${parseMarkdownAndHTML(message.message_text)}</p>
+        //         </div>
+        //     `).join('');
+        // }
     }
 
     // Функция обновления информации о персонаже
@@ -256,7 +291,6 @@ document.addEventListener('DOMContentLoaded', function() {
         document.addEventListener('click', closeMenuOutside);
     });
 
-    // Закрытие бокового меню
     menuClose.addEventListener('click', function() {
         sideMenu.classList.remove('open');
         document.removeEventListener('click', closeMenuOutside);
@@ -293,25 +327,9 @@ document.addEventListener('DOMContentLoaded', function() {
     sendButton.addEventListener('click', function() {
         const message = messageInput.value.trim();
         if (message) {
-            // Добавляем сообщение только локально
-            const messageDiv = document.createElement('div');
-            messageDiv.classList.add('message', 'sent');
-            
-            const senderDiv = document.createElement('div');
-            senderDiv.classList.add('sender-name');
-            senderDiv.textContent = currentPlayerName;
-            
-            const textDiv = document.createElement('div');
-            textDiv.classList.add('message-text');
-            textDiv.innerHTML = parseMarkdownAndHTML(message);
-            
-            messageDiv.appendChild(senderDiv);
-            messageDiv.appendChild(textDiv);
-            
-            chatMessages.appendChild(messageDiv);
+            addMessage(message, character_name)
+            send_interaction_request(message)
             chatMessages.scrollTop = chatMessages.scrollHeight;
-
-            // Очищаем поле ввода
             messageInput.value = '';
         }
     });
@@ -324,6 +342,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // Функция для парсинга Markdown и HTML
+    // ! под снос
     function parseMarkdownAndHTML(inputText) {
         try {
             if (typeof marked === 'undefined') {
@@ -353,5 +372,5 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Запускаем периодическое обновление каждые 5 секунд
     fetchUpdates(); // Первый запрос сразу
-    setInterval(fetchUpdates, 5000); // Увеличил интервал до 5 секунд
+    // setInterval(fetchUpdates, 5000); // Увеличил интервал до 5 секунд
 });

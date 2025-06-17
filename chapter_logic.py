@@ -350,6 +350,12 @@ class ChapterLogicFight:
         for character in self.characters:
             print(f"\n{HEADER_COLOR}👤 {character.name}'s turn:{Colors.RESET}")
     
+    def get_character_by_name(self, name:str) -> Character:
+        for char in self.characters:
+            if  char.name == name:
+                return char
+        return self.characters[0]
+    
     def after_turn(self):
         """
         Actions to perform after each player's turn.
