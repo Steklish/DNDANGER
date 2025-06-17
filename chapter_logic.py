@@ -2,6 +2,7 @@ import random
 from dotenv import load_dotenv
 from numpy import character
 from pyparsing import Char
+from sympy import true
 from classifier import Classifier
 from generator import ObjectGenerator
 from models import *
@@ -122,6 +123,8 @@ class ChapterLogicFight:
         self.context = self.classifier.general_text_llm_request(
         f"""
             Provide the details that matter for the next scene. 
+            Try to extract Dungeon Master's intent on the current scene and the context.
+            Store which characters are allied with which ones and what can change this alliance. Store their motivations and goals.
             If some info is missing you are allowed to create it. 
             Dont ask additional information.
             in no context provided at all come up with something like "evry memory have faded away and the past seems very blury". 
@@ -132,7 +135,7 @@ class ChapterLogicFight:
         )
         
         self.turn_order = [char.name for char in self.characters]
-        self.turn_order = random.shuffle(self.turn_order)
+        random.shuffle(self.turn_order)
         print(f"{INFO_COLOR}Turn order shuffled{Colors.RESET}")
         
         print(f"\n{HEADER_COLOR}Current Scene:{Colors.RESET}")
@@ -172,12 +175,52 @@ class ChapterLogicFight:
         prompt = f"""
         {global_defines.dungeon_master_core_prompt}
         
-        Ты Мастер D&D. Определи исход действия. Используй HTML-теги: 
-        тег для слов или отвков текста, которые описывают урон <span class="damage">урон</span>, 
-        тег для слов или отвков текста, которые описывают исцеление <span class="heal">исцеление</span>, 
-        тег для слов или отвков текста, которые описывают состояния <span class="condition">состояние</span>, 
-        тег для имён <span class="name">Имя</span>.
-        Следи за тем, чтобы действия были логически обоснованы, особенно если действующее лицо - это игрок.
+        Твоя главная задача — определять и красочно описывать исход действий, заявленных игроком. Ты должен быть беспристрастным симулятором правил и одновременно творческим рассказчиком, который делает мир живым.
+        
+        Прежде чем писать ответ, ты должен внутренне симулировать исход действия, основываясь на логике правил D&D. Хотя у тебя нет реальных "листов персонажей", ты должен действовать так, как будто они есть.
+
+        *   **Оценивай Источник Действия:**
+            *   **Оружие/Заклинание:** Двуручный топор наносит больше урона, чем кинжал. Огненный шар поражает область, а не одну цель.
+            *   **Предполагаемые Характеристики:** Персонаж-воин, вероятно, силен и хорошо владеет мечом. Персонаж-маг, скорее всего, слаб в рукопашном бою, но силен в магии.
+
+        *   **Оценивай Цель:**
+            *   **Броня и Защита:** Попасть по рыцарю в полных латах сложнее, чем по гоблину в лохмотьях. Урон по бронированной цели должен быть ниже.
+            *   **Уязвимости/Сопротивления:** Демон может иметь сопротивление к огню (получает меньше урона), а ледяной элементаль будет уязвим к нему (получает больше урона).
+
+        *   **Учитывай Окружение:**
+            *   **Преимущество/Помеха:** Атака из укрытия или по <span class="condition">ослепленному</span> врагу должна быть успешнее. Бой в темноте или на скользкой поверхности — менее успешным.
+        *   **Учитывай Состояние Персонажа:**
+        
+        При создании описания исхода **обязательно** используй следующие HTML-теги для выделения ключевых элементов повествования.
+
+        *   `<strong><span class="name">Имя</span></strong>`: Используй для всех имен собственных: персонажей, монстров, божеств, названий мест (города, таверны) и т.д.
+            *   *Пример:* `<span class="name">Горк</span>`, `<span class="name">Элара</span>`, `<span class="name">Вотердип</span>`.
+
+        *   `<strong><span class="damage">текст урона</span></strong>`: Используй для **любого** описания получения вреда, боли или потери жизненных сил.
+            *   *Пример:* Меч орка <span class="damage">глубоко вонзается тебе в плечо</span>. Ты чувствуешь, как <span class="damage">огненный шар опаляет твою кожу</span>.
+
+        *   `<strong><span class="heal">текст исцеления</span></strong>`: Используй для **любого** описания восстановления здоровья, заживления ран или магического исцеления.
+            *   *Пример:* Теплое сияние <span class="heal">разливается по твоему телу, затягивая рану</span>. Глоток зелья <span class="heal">придает тебе новых сил</span>.
+
+        *   `<strong><span class="condition">текст состояния</span></strong>`: Используй для описания наложения или получения специальных эффектов и состояний.
+            *   *Пример:* От яда паука твои ноги <span class="condition">становятся ватными</span>. Ужасающий рык вгоняет тебя в <span class="condition">состояние паники</span>. Яркая вспышка <span class="condition">ослепляет тебя на мгновение</span>.
+
+        #### **5. Примеры Работы**
+
+        **Пример 1: Атака**
+        *   **Запрос Игрока:** "Мой варвар <span class="name">Крэг</span> бьет гоблина своей секирой."
+        *   **Ответ ИИ (Успех):**
+            > <span class="name">Крэг</span> издает боевой клич и обрушивает свою огромную секиру на врага. <span class="name">Гоблин</span> пытается поднять свой маленький щит, но он разлетается в щепки от мощи удара. Лезвие глубоко <span class="damage">вгрызается в плечо монстра, нанося 11 единиц рубящего урона</span>. <span class="name">Гоблин</span> вопит и отшатывается назад, хватаясь за раненую руку.
+
+        **Пример 2: Проваленная атака из-за брони**
+        *   **Запрос Игрока:** "Мой плут <span class="name">Финн</span> пытается ударить рыцаря кинжалом."
+        *   **Ответ ИИ (Провал):**
+            > <span class="name">Финн</span> молниеносно выскакивает из тени и наносит укол в спину закованному в сталь рыцарю. Однако острие кинжала лишь со скрежетом скользит по толстым латам. Твоя атака не смогла пробить его защиту. Рыцарь медленно разворачивается, его взгляд сквозь прорезь шлема устремлен прямо на тебя.
+
+        **Пример 3: Исцеление**
+        *   **Запрос Игрока:** "Жрица <span class="name">Алианна</span> кастует "Исцеление ран" на <span class="name">Гимли</span>."
+        *   **Ответ ИИ:**
+            > <span class="name">Алианна</span> кладет руки на грудь раненого <span class="name">Гимли</span> и шепчет слова молитвы. Ее ладони окутывает божественное сияние, которое перетекает в тело гнома. Ты видишь, как его раны начинают закрываться. Теплое сияние <span class="heal">восстанавливает ему 9 очков здоровья</span>, и он перестает хрипеть, его дыхание выравнивается.
 
         Контекст:
         {self.get_actual_context()}
@@ -186,6 +229,7 @@ class ChapterLogicFight:
         reply = self.classifier.general_text_llm_request(prompt)
         self.context += f"\n\n{character.name} performs action (DM's response): {reply}" # type: ignore
         self.apply_changes_after_turn(reply, character) # type: ignore
+        chapter.move_to_next_turn()
         return reply
     
     def apply_changes_after_turn(self, action_description : str, character : Character):
@@ -215,7 +259,12 @@ class ChapterLogicFight:
                     )
             elif change.object_type == "scene":
                 self.update_scene(change.object_name, change.changes)
-            self.context += str(change) # type: ignore
+            self.context += f"""
+            SYSTEM LOG [
+                {change}
+                was applied
+            ]
+            """ # type: ignore
         print("ALl the changes applied successfully")
         
     def askedDM(self, character: Character, question: str):
@@ -243,7 +292,7 @@ class ChapterLogicFight:
         self.context = self.classifier.general_text_llm_request(
             f"""
                 Make this actions log about {MAX_CONTEXT_LENGTH} words long.
-                Dont miss important details even if they are not directly related to the current scene or if they are in the past.
+                Dont miss important details even if they are not directly related to the current scene or if they are in the past. Try to not miss DM's intent. If the context is short enough, just return it as is.
             """
         )
         
@@ -263,7 +312,7 @@ class ChapterLogicFight:
             """, 
             pydantic_model=ClassifyInformationOrActionRequest
         )  # type: ignore
-        
+        interaction += "\n\n"
         interaction += decision.reasoning # type: ignore
         result = None
         if decision.decision: # type: ignore
@@ -300,6 +349,31 @@ class ChapterLogicFight:
             self.context = updated_context
             print(f"{SUCCESS_COLOR}✨ Context updated{Colors.RESET}")
 
+    def enemy_turn(self):
+        """
+        Handles the enemy's turn in the fight.
+        """
+        print(f"\n{HEADER_COLOR}👹 Enemy's turn:{Colors.RESET}")
+        # Here you can implement enemy actions, AI logic, etc.
+        # For now, we will just simulate an enemy action
+        NPC_action = self.classifier.general_text_llm_request(
+            f"""
+            {global_defines.dungeon_master_core_prompt}
+            Сейчас ты выступаешь в роли персонажа, который контролируется мастером (враг или неигровой персонаж). 
+            Пожалуйста, опиши его действия.
+            ПЕРСОНАЖ:
+            {self.get_active_character().model_dump_json(indent=2)}
+            SCENE CONTEXT:
+            {self.get_actual_context()}
+            
+            пример ответа:
+            <имя персонажа> замахивается мечом, крича "За короля!" и наносит удар по противнику <имя противника>.
+            """
+        )
+        
+        self.action(self.get_active_character(), NPC_action) # type: ignore
+        
+        
 if __name__ == "__main__":
     load_dotenv()
 
@@ -314,14 +388,39 @@ if __name__ == "__main__":
     # print(chapter.characters[0].model_dump_json(indent=2))
     
     # scene change test
-    print(f"{HEADER_COLOR}🎮 Starting new chapter...{Colors.RESET}")
-    chapter = ChapterLogicFight(context = "the journey begins...")
+    # print(f"{HEADER_COLOR}🎮 Starting new chapter...{Colors.RESET}")
+    # chapter = ChapterLogicFight(context = "the journey begins...")
+    # chapter.setup_fight()
+    # r_ch = chapter.generator.generate(Character, "random character with full hp and no items in inventory", "no context", "Russian")
+    # print(r_ch.model_dump_json(indent=2))
+    # chapter.characters.append(r_ch)
+    # hhh = input("enter a question to a DM...    ")
+    # print(chapter.process_interaction(chapter.characters[0], hhh)) # type: ignore
+    
+    
+    # enemy turn test
+    generator = ObjectGenerator()
+    context = "Ice cave in a frozen mountain, where a group of adventurers is trapped by a powerful ice elemental."
+    print(f"{HEADER_COLOR}🎮 Starting new chapter (enemy turn test)...{Colors.RESET}")
+    chapter = ChapterLogicFight(
+        context = context,
+        characters = [
+            generator.generate(Character, "random character with full hp and a single dager (player character)", context, "Russian"),
+            generator.generate(Character, "random monster with full hp and some magic spells (enemy NPC)", context, "Russian")
+        ]
+    )
     chapter.setup_fight()
-    r_ch = chapter.generator.generate(Character, "random character with full hp and no items in inventory", "no context", "Russian")
-    print(r_ch.model_dump_json(indent=2))
-    chapter.characters.append(r_ch)
-    print(chapter.scene.model_dump_json(indent=2)) # type: ignore
-    chapter.update_scene(chapter.scene.name, "заставь все гореть в пожаре") # type: ignore
-    print(chapter.scene.model_dump_json(indent=2)) # type: ignore
-    hhh = input("enter a question to a DM...    ")
-    print(chapter.process_interaction(chapter.characters[0], hhh)) # type: ignore
+    def print_game_sate():
+        for c in chapter.characters:
+            print(c.model_dump_json(indent=2))
+        print(chapter.scene.model_dump_json(indent=2)) # type: ignore
+        print(chapter.turn_order)
+    while true:
+        if chapter.get_active_character().is_player:
+            user_input = input(f"{ENTITY_COLOR}{chapter.get_active_character_name()} -->{Colors.RESET}  ")
+            if user_input == "?": 
+                print_game_sate()
+                continue
+            chapter.process_interaction(chapter.characters[0], user_input) # type: ignore
+        else:
+            dm_action = chapter.enemy_turn()
