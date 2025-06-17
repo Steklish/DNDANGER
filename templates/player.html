@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
@@ -11,42 +10,102 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300..700;1,300..700&display=swap" rel="stylesheet">
+    <!-- Заменяем локальный marked.js на CDN версию -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
     <!-- Боковое меню -->
     <div class="side-menu" id="sideMenu">
         <div class="menu-header">            
-            <div class="menu-title">Game Settings</div>
+            <div class="menu-title">Game Info</div>
             <!-- Mobile menu close button -->
             <button class="menu-toggle" id="menuClose">
                 <span class="material-icons">close</span>
             </button>
-            <!-- Sidebar collapse toggle button -->
-            <button class="collapse-toggle" id="collapseToggle">
-                <span class="material-icons">chevron_left</span>
-            </button>
         </div>
-        <!-- Содержимое бокового меню -->
+        <!-- Обновленное содержимое бокового меню -->
         <div class="menu-content">
+            <!-- Основная информация о персонаже -->
             <div class="menu-item">
                 <span class="material-icons">person</span>
-                <span>Character Info</span>
-                <div class="menu-dropdown" id="characterDropdown">
-                    <h3>Character Details</h3>
-                    <p><strong>Name:</strong> Player1</p>
-                    <p><strong>HP:</strong> 50 / 100</p>
-                    <p><strong>Abilities:</strong></p>
-                    <ul>
-                        <li>Fireball: Deals massive damage</li>
-                    </ul>
+                <span>Basic Info</span>
+                <div class="menu-dropdown" id="basicInfoDropdown">
+                    <h3>Character Stats</h3>
+                    <div id="characterBasicInfo">
+                        <p><strong>Name:</strong> <span id="charName">Loading...</span></p>
+                        <p><strong>HP:</strong> <span id="charHP">Loading...</span></p>
+                        <p><strong>AC:</strong> <span id="charAC">Loading...</span></p>
+                        <div id="charConditions">
+                            <strong>Conditions:</strong>
+                            <ul id="conditionsList"></ul>
+                        </div>
+                    </div>
                 </div>
             </div>
+
+            <!-- Инвентарь -->
             <div class="menu-item">
-                <span class="material-icons">history</span>
-                <span>Game History</span>
+                <span class="material-icons">inventory_2</span>
+                <span>Inventory</span>
+                <div class="menu-dropdown" id="inventoryDropdown">
+                    <h3>Equipment & Items</h3>
+                    <div id="inventoryList">
+                        <!-- Предметы будут добавляться динамически -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Способности -->
+            <div class="menu-item">
+                <span class="material-icons">auto_awesome</span>
+                <span>Abilities</span>
+                <div class="menu-dropdown" id="abilitiesDropdown">
+                    <h3>Character Abilities</h3>
+                    <div id="abilitiesList">
+                        <!-- Способности будут добавляться динамически -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- История персонажа -->
+            <div class="menu-item">
+                <span class="material-icons">history_edu</span>
+                <span>Background</span>
+                <div class="menu-dropdown" id="backgroundDropdown">
+                    <h3>Character History</h3>
+                    <div id="personalityHistory">
+                        <!-- История персонажа будет добавлена динамически -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Информация о сцене -->
+            <div class="menu-item">
+                <span class="material-icons">landscape</span>
+                <span>Scene</span>
+                <div class="menu-dropdown" id="sceneDropdown">
+                    <h3>Current Location</h3>
+                    <div id="sceneInfo">
+                        <p><strong>Name:</strong> <span id="sceneName">Loading...</span></p>
+                        <p><strong>Description:</strong> <span id="sceneDescription">Loading...</span></p>
+                        <p><strong>Size:</strong> <span id="sceneSize">Loading...</span></p>
+                        <div id="sceneObjects">
+                            <h4>Objects in Scene:</h4>
+                            <!-- Объекты сцены будут добавляться динамически -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- История чата -->
+            <div class="menu-item">
+                <span class="material-icons">chat_bubble</span>
+                <span>Chat History</span>
                 <div class="menu-dropdown" id="historyDropdown">
-                    <h3>Recent Events</h3>
-                    <p>No recent events available.</p>
+                    <h3>Recent Messages</h3>
+                    <div id="chatHistory">
+                        <!-- История сообщений будет добавляться динамически -->
+                    </div>
                 </div>
             </div>
         </div>
@@ -81,19 +140,5 @@
     <!-- Подключение JavaScript -->
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const menuItems = document.querySelectorAll('.menu-item');
-
-            menuItems.forEach(item => {
-                const dropdown = item.querySelector('.menu-dropdown');
-                item.addEventListener('click', function() {
-                    const isExpanded = dropdown.style.display === 'block';
-                    dropdown.style.display = isExpanded ? 'none' : 'block';
-                    dropdown.style.maxHeight = isExpanded ? '0' : '50vh';
-                });
-            });
-        });
-    </script>
 </body>
 </html>

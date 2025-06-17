@@ -32,14 +32,19 @@ body {
 
 /* Side Menu */
 .side-menu {
-    width: 280px;
-    background-color: var(--bg-card);
-    border-right: 1px solid var(--divider);
+    position: fixed;
+    left: 0;
+    top: 0;
     height: 100vh;
-    transition: transform 0.3s ease, width 0.3s ease;
-    display: flex;
-    flex-direction: column;
-    z-index: 10;
+    width: 50%;
+    background-color: var(--bg-card);
+    transform: translateX(-100%);
+    transition: all 0.3s ease;
+    z-index: 1000;
+}
+
+.side-menu.open {
+    transform: translateX(0);
 }
 
 .side-menu.collapsed {
@@ -56,17 +61,25 @@ body {
 }
 
 .menu-header {
-    padding: 16px;
+    padding: 15px;
     display: flex;
     align-items: center;
     justify-content: space-between;
     border-bottom: 1px solid var(--divider);
 }
 
+.menu-header {
+    display: flex;
+    align-items: center;
+    padding: 15px;
+    background-color: #252525;
+    border-bottom: 1px solid #333;
+}
+
 .menu-title {
+    flex-grow: 1;
     font-size: 1.2em;
-    font-weight: 500;
-    color: var(--primary);
+    color: var(--text-primary);
 }
 
 .menu-toggle {
@@ -74,7 +87,21 @@ body {
     border: none;
     color: var(--text-primary);
     cursor: pointer;
-    display: none;
+    padding: 8px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 10px;
+    z-index: 999; /* Меньше чем у side-menu */
+}
+
+.menu-toggle:hover {
+    background-color: var(--bg-surface);
+}
+
+.menu-toggle .material-icons {
+    font-size: 24px;
 }
 
 .collapse-toggle {
@@ -85,17 +112,16 @@ body {
 }
 
 .menu-content {
-    flex: 1;
+    padding: 15px;
+    height: calc(100vh - 60px);
     overflow-y: auto;
-    padding: 16px 0;
 }
 
 .menu-item {
-    padding: 12px 16px;
-    display: flex;
-    align-items: center;
-    cursor: pointer;
-    transition: background-color 0.2s;
+    background-color: var(--bg-surface);
+    border-radius: 8px;
+    margin-bottom: 15px;
+    overflow: hidden;
 }
 
 .menu-item:hover {
@@ -107,13 +133,103 @@ body {
     color: var(--text-secondary);
 }
 
-/* Main Chat Area */
+.expand-icon {
+    margin-left: auto;
+    transition: transform 0.3s ease;
+}
+
+.menu-item.expanded .expand-icon {
+    transform: rotate(180deg);
+}
+
+.menu-dropdown {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+    background-color: var(--bg-dark);
+}
+
+.menu-item.expanded .menu-dropdown {
+    max-height: calc(100vh - 200px);
+    background-color: var(--bg-card);
+    padding: 10px;
+}
+
+.menu-dropdown {
+    display: none;
+    background-color: #1f1f1f;
+    padding: 15px;
+}
+
+.menu-item.expanded .menu-dropdown {
+    display: block;
+}
+
+.dropdown-content {
+    padding: 15px;
+    background-color: var(--bg-surface);
+    border-radius: 0 0 8px 8px;
+    color: #ddd;
+}
+
+.dropdown-content h3 {
+    margin-top: 0;
+    color: #fff;
+    margin-bottom: 10px;
+}
+
+.dropdown-content p {
+    margin: 5px 0;
+}
+
+.dropdown-content ul {
+    list-style: none;
+    padding-left: 0;
+}
+
+.dropdown-content li {
+    margin: 5px 0;
+    padding-left: 20px;
+    position: relative;
+}
+
+.dropdown-content li:before {
+    content: "•";
+    position: absolute;
+    left: 0;
+    color: var(--primary);
+}
+
+/* Убираем дублирующиеся стили */
+.menu-toggle, .collapse-toggle {
+    background: none;
+    border: none;
+    color: var(--text-primary);
+    padding: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.menu-toggle:hover, .collapse-toggle:hover {
+    background-color: var(--bg-dark);
+    border-radius: 4px;
+}
+
+/* Основной контент */
 .main-content {
     flex: 1;
     display: flex;
     flex-direction: column;
     height: 100vh;
     position: relative;
+    margin-left: 0;
+    transition: margin-left 0.3s ease;
+}
+
+.side-menu.open + .main-content {
+    margin-left: 50%;
 }
 
 .chat-header {
@@ -125,6 +241,7 @@ body {
     display: flex;
     align-items: center;
     border-bottom: 1px solid var(--divider);
+    position: relative; /* Добавляем для правильного позиционирования */
 }
 
 .chat-header .material-icons {
@@ -247,22 +364,26 @@ body {
     background: var(--primary-dark);
 }
 
-/* Responsive */
+/* Медиа-запросы */
 @media (max-width: 768px) {
     .side-menu {
+        position: fixed;
+        width: 80%;
+        z-index: 1000;
+    }
+
+    .chat-header {
+        padding-left: 60px; /* Освобождаем место для кнопки меню */
+    }
+
+    .menu-toggle#menuOpen {
         position: absolute;
-        transform: translateX(-100%);
+        left: 10px;
+        top: 50%;
+        transform: translateY(-50%);
     }
-    
-    .side-menu.open {
-        transform: translateX(0);
-    }
-    
-    .menu-toggle {
-        display: block;
-    }
-    
-    .message {
-        max-width: 85%;
+
+    .main-content {
+        margin-left: 0 !important; /* Принудительно убираем отступ на мобильных */
     }
 }

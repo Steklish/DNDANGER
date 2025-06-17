@@ -168,7 +168,7 @@ def get_info():
         }
 
     ]
-     # Convert the Pydantic objects into dictionaries that jsonify can handle.
+    # Convert the Pydantic objects into dictionaries that jsonify can handle.
     content = {
         # .model_dump() converts the Scene object to a dictionary
         "scene": scene.model_dump(), 
