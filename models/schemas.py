@@ -78,7 +78,7 @@ class Character(BaseModel):
 class SceneObject(BaseModel):
     """
     Pydantic schema for a general object within a scene, like a door, tree, or statue.
-    This is for background elements that characters might interact with.
+    This is for background elements that characters might interact with. Remember never use this scheme to create a character or an NPC.
     """
     name: str = Field(description="The short, identifiable name of the object (e.g., 'Large Oak Door', 'Ancient Weeping Willow').")
     description: str = Field(description="A detailed visual and sensory description of the object. What does it look, feel, or smell like?")
