@@ -137,7 +137,24 @@ def get_info():
             "sender_name": "Gideon"
             },
             {
-            "message_text": "Я слышал, что старый библиотекарь упоминал о нем. Может, стоит поискать в заброшенной библиотеке?",
+            "message_text": """
+            <span class='name'>Ледяной элементаль</span> поднимает свои <span class='keyword'>ледяные когти</span> и <span class='keyword'>обрушивает их на тебя</span>, <span class='name'>Ледяной Клинок</span>, в момент, когда ты <span class='condition'>лежишь на льду</span>.
+
+Он совершает <span class='keyword'>бросок атаки</span>...
+
+<span class='keyword'>17!</span>
+
+Атака <span class='keyword'>попадает</span>!
+
+<span class='keyword'>Ледяные когти</span> обрушиваются на тебя.
+
+<span class='keyword'>Ледяной элементаль</span> наносит тебе удар.
+
+Кидает кубики, чтобы определить урон...
+
+<span class='keyword'>11 рубящего урона</span>, и <span class='keyword'>1 урона холодом</span>!
+
+Ты получаешь <span class='keyword'>12 урона</span>.""",
             "sender_name": "DM"
             },
             {
