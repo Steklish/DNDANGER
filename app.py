@@ -1,14 +1,24 @@
 # Импортируем необходимые библиотеки Flask для веб-приложения
-from flask import Flask, jsonify, render_template
+from flask import Flask, jsonify, render_template, Response
 from models import *
+import json
+import time
 # Создаем экземпляр приложения Flask
 app = Flask(__name__)
 
 # Определяем маршрут для главной страницы
 @app.route('/')
 def index():
-    # Отображаем шаблон index.html
+    # Отображаем шаблон login.html
+    return render_template('login.html')
+
+@app.route('/player.html')
+def player():
     return render_template('player.html')
+
+@app.route('/observer.html')
+def observer():
+    return render_template('observer.html')
 
 @app.route('/refresh')
 def get_info():

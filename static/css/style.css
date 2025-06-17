@@ -46,6 +46,10 @@ body {
     width: 60px;
 }
 
+.side-menu.open {
+    transform: translateX(0);
+}
+
 .side-menu.collapsed .menu-title,
 .side-menu.collapsed .menu-item span:not(.material-icons) {
     display: none;

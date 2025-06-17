@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
@@ -14,8 +15,8 @@
 <body>
     <!-- Боковое меню -->
     <div class="side-menu" id="sideMenu">
-    <div class="menu-header">            
-        <div class="menu-title">Game Settings</div>
+        <div class="menu-header">            
+            <div class="menu-title">Game Settings</div>
             <!-- Mobile menu close button -->
             <button class="menu-toggle" id="menuClose">
                 <span class="material-icons">close</span>
@@ -29,23 +30,24 @@
         <div class="menu-content">
             <div class="menu-item">
                 <span class="material-icons">person</span>
-                <span>Profile</span>
+                <span>Character Info</span>
+                <div class="menu-dropdown" id="characterDropdown">
+                    <h3>Character Details</h3>
+                    <p><strong>Name:</strong> Player1</p>
+                    <p><strong>HP:</strong> 50 / 100</p>
+                    <p><strong>Abilities:</strong></p>
+                    <ul>
+                        <li>Fireball: Deals massive damage</li>
+                    </ul>
+                </div>
             </div>
             <div class="menu-item">
-                <span class="material-icons">group</span>
-                <span>Contacts</span>
-            </div>
-            <div class="menu-item">
-                <span class="material-icons">notifications</span>
-                <span>Notifications</span>
-            </div>
-            <div class="menu-item">
-                <span class="material-icons">settings</span>
-                <span>Settings</span>
-            </div>
-            <div class="menu-item">
-                <span class="material-icons">help</span>
-                <span>Help</span>
+                <span class="material-icons">history</span>
+                <span>Game History</span>
+                <div class="menu-dropdown" id="historyDropdown">
+                    <h3>Recent Events</h3>
+                    <p>No recent events available.</p>
+                </div>
             </div>
         </div>
     </div>
@@ -78,5 +80,20 @@
     </div>
     <!-- Подключение JavaScript -->
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const menuItems = document.querySelectorAll('.menu-item');
+
+            menuItems.forEach(item => {
+                const dropdown = item.querySelector('.menu-dropdown');
+                item.addEventListener('click', function() {
+                    const isExpanded = dropdown.style.display === 'block';
+                    dropdown.style.display = isExpanded ? 'none' : 'block';
+                    dropdown.style.maxHeight = isExpanded ? '0' : '50vh';
+                });
+            });
+        });
+    </script>
 </body>
 </html>

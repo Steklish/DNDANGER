@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Observer Interface</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-primary);
+            font-family: "Cormorant Garamond", serif;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1 {
+            text-align: center;
+            color: var(--primary);
+            font-size: 2.5em;
+            margin-bottom: 20px;
+            text-transform: uppercase;
+        }
+
+        .admin-menu {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        .menu-card {
+            background-color: var(--bg-card);
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            width: 250px;
+            text-align: center;
+        }
+
+        .menu-card h2 {
+            color: var(--primary);
+            font-size: 1.5em;
+            margin-bottom: 10px;
+        }
+
+        .menu-card p {
+            font-size: 1em;
+            line-height: 1.4;
+        }
+
+        .player-card {
+            background-color: var(--bg-card);
+            padding: 15px;
+            margin: 10px auto;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            max-width: 800px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .block {
+            padding: 10px;
+            background-color: var(--bg-surface);
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        h2 {
+            color: var(--primary);
+            font-size: 1.8em;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        h3 {
+            color: var(--text-secondary);
+            font-size: 1.2em;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+        }
+
+        p, li {
+            font-size: 1em;
+            line-height: 1.6;
+        }
+
+        ul {
+            list-style-type: none;
+            padding: 0;
+        }
+
+        li {
+            margin-bottom: 8px;
+        }
+
+        .conditions {
+            font-style: italic;
+            color: var(--text-secondary);
+        }
+
+        .hp-bar {
+            height: 15px;
+            width: 100%;
+            background-color: var(--bg-surface);
+            border-radius: 8px;
+            overflow: hidden;
+            margin-top: 8px;
+        }
+
+        .hp-bar-inner {
+            height: 100%;
+            background-color: var(--primary);
+            width: 0;
+            transition: width 0.3s ease;
+        }
+    </style>
+    <script>
+        const eventSource = new EventSource("/stream");
+
+        eventSource.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+
+            const playersContainer = document.getElementById('players');
+            playersContainer.innerHTML = '';
+
+            data.characters.forEach(player => {
+                if (!player.is_player) return; // Игнорируем админа
+
+                const playerDiv = document.createElement('div');
+                playerDiv.classList.add('player-card');
+
+                const hpPercentage = (player.current_hp / player.max_hp) * 100;
+
+                playerDiv.innerHTML = `
+                    <h2>${player.name}</h2>
+                    <div class="block">
+                        <h3>HP</h3>
+                        <p><strong>Current:</strong> ${player.current_hp} / ${player.max_hp}</p>
+                        <div class="hp-bar">
+                            <div class="hp-bar-inner" style="width: ${hpPercentage}%;"></div>
+                        </div>
+                    </div>
+                    <div class="block">
+                        <h3>Abilities</h3>
+                        <ul>
+                            ${player.abilities.map(ability => `
+                                <li>
+                                    <strong>${ability.name}</strong>: ${ability.description}
+                                </li>
+                            `).join('')}
+                        </ul>
+                    </div>
+                    <div class="block">
+                        <h3>Inventory</h3>
+                        <ul>
+                            ${player.inventory.map(item => `
+                                <li>
+                                    <strong>${item.name}</strong> (${item.item_type}) - ${item.description}
+                                </li>
+                            `).join('')}
+                        </ul>
+                    </div>
+                    <div class="block">
+                        <h3>Conditions</h3>
+                        <p class="conditions">${player.conditions.join(', ') || 'None'}</p>
+                    </div>
+                `;
+                playersContainer.appendChild(playerDiv);
+            });
+        };
+
+        function changeScene() {
+            alert('Scene changed!');
+        }
+    </script>
+</head>
+<body>
+    <h1>Observer Interface</h1>
+    <div class="admin-menu">
+        <div class="menu-card">
+            <h2>Scene Overview</h2>
+            <p>View and manage the current scene.</p>
+        </div>
+        <div class="menu-card">
+            <h2>Player Stats</h2>
+            <p>Monitor player health, abilities, and inventory.</p>
+        </div>
+        <div class="menu-card">
+            <h2>Game History</h2>
+            <p>Review past actions and events.</p>
+        </div>
+    </div>
+    <div class="scene-management">
+        <h2>Scene Management</h2>
+        <button onclick="changeScene()">Change Scene</button>
+    </div>
+    <div id="players"></div>
+</body>
+</html>

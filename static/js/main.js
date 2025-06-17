@@ -8,24 +8,61 @@ document.addEventListener('DOMContentLoaded', function() {
     const menuOpen = document.getElementById('menuOpen');
     const menuClose = document.getElementById('menuClose');
     const collapseToggle = document.getElementById('collapseToggle');
-    
-    // Обработка открытия бокового меню
+    const menuItems = document.querySelectorAll('.menu-item');
+
+    // Открытие бокового меню
     menuOpen.addEventListener('click', function() {
         sideMenu.classList.add('open');
     });
-    
-    // Обработка закрытия бокового меню
+
+    // Закрытие бокового меню
     menuClose.addEventListener('click', function() {
         sideMenu.classList.remove('open');
     });
 
-    // Переключение состояния сворачивания бокового меню
+    // Сворачивание бокового меню
     collapseToggle.addEventListener('click', function() {
         sideMenu.classList.toggle('collapsed');
         const icon = collapseToggle.querySelector('.material-icons');
         icon.textContent = sideMenu.classList.contains('collapsed') ? 'chevron_right' : 'chevron_left';
     });
-    
+
+    // Действия для кнопок бокового меню
+    menuItems.forEach(item => {
+        item.addEventListener('click', function() {
+            const action = item.querySelector('span:last-child').textContent.trim();
+            const modal = document.createElement('div');
+            modal.classList.add('modal');
+            modal.innerHTML = `
+                <div class="modal-content">
+                    <span class="close-button">&times;</span>
+                    <h2>${action}</h2>
+                    <p>Content for ${action} goes here...</p>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            modal.querySelector('.close-button').addEventListener('click', () => {
+                modal.remove();
+            });
+        });
+    });
+
+    function parseMarkdownAndHTML(inputText) {
+        // Парсим Markdown в HTML
+        const htmlContent = marked(inputText);
+
+        // Создаем контейнер для HTML
+        const container = document.createElement('div');
+        container.innerHTML = htmlContent;
+
+        // Раскрашиваем HTML-классы
+        container.querySelectorAll('.html-class').forEach(element => {
+            element.style.color = 'blue'; // Задайте нужный цвет
+        });
+
+        return container.innerHTML;
+    }
+
     // Функция добавления нового сообщения в чат
     function addMessage(text, sender, isReceived) {
         const messageDiv = document.createElement('div');
@@ -38,7 +75,7 @@ document.addEventListener('DOMContentLoaded', function() {
         senderName.textContent = sender;
         
         const messageText = document.createElement('div');
-        messageText.textContent = text;
+        messageText.innerHTML = parseMarkdownAndHTML(text); // Парсим Markdown и HTML
         
         const timestamp = document.createElement('div');
         timestamp.classList.add('timestamp');
