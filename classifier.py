@@ -1,6 +1,7 @@
 import os
 from dotenv import load_dotenv
 from google import genai
+from langcodes import Language
 from pydantic import BaseModel
 from typing import Type, TypeVar, Optional
 from pydantic import BaseModel, ValidationError
@@ -64,23 +65,54 @@ class Classifier:
         
         
         
-    def general_text_llm_request(self, contents: str, response_mime_type: str = "text/plain"):
+    def general_text_llm_request(
+        self,
+        contents: str,
+        language: str = "Russian",
+        response_mime_type: str = "text/plain"
+    ) -> Optional[str]:
         """
-        General method to make a text request to the LLM.
+        Makes a clear text request to the LLM with improved language handling.
+
+        Args:
+            contents: The primary prompt or content for the LLM.
+            language: The desired language for the response (e.g., "Russian", "English").
+            response_mime_type: The expected MIME type for the response.
+
+        Returns:
+            The response text as a string if successful, otherwise None.
         """
+        # --- IMPROVEMENT: A simple, clear header for the prompt ---
+        # This gives the language instruction priority and context without over-engineering.
+        # It also fixes the 'Language' vs 'language' bug.
+        full_prompt = (
+            f"Задание: Ответь на следующий запрос на {language} языке.\n"
+            "---"
+            f"\n{contents}"
+        )
+
         try:
-            print(f"{INFO_COLOR}🤖 Making text request to model:{Colors.RESET} {ENTITY_COLOR}{self.model}{Colors.RESET}")
+            print(f"{INFO_COLOR}🤖 Making text request to model: {ENTITY_COLOR}{self.model}{Colors.RESET}")
+            # The full_prompt is now used in the API call
             response = self.client.models.generate_content(
                 model=self.model,
-                contents=contents,
+                contents=full_prompt,
                 config={
-                    "response_mime_type": response_mime_type,
-                }
+					"response_mime_type": response_mime_type,
+				}
             )
             print(f"{SUCCESS_COLOR}✅ Response received{Colors.RESET}")
-            return response.text
+            
+            # It's good practice to check if the response is actually there
+            # before returning it, as it could be blocked by safety filters.
+            if response.text:
+                return response.text
+            else:
+                print(f"{ERROR_COLOR}❌ Received an empty response (possibly blocked by safety filters).{Colors.RESET}")
+                return None
+
         except Exception as e:
-            print(f"{ERROR_COLOR}❌ Error in text request:{Colors.RESET} {e}")
+            print(f"{ERROR_COLOR}❌ Error in text request: {e}{Colors.RESET}")
             return None
         
         

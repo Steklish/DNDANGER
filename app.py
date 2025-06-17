@@ -73,6 +73,7 @@ def get_info():
         "name": "Gideon 'Grizzly' Blackwood",
         "max_hp": 35,
         "current_hp": 28,
+        "is_alive" : true,
         "ac": 16,
         "is_player": true,
         "conditions": [],

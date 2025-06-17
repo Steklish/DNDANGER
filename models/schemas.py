@@ -62,23 +62,19 @@ class Character(BaseModel):
     name: str = Field(description="Полное имя или титул персонажа.")
     max_hp: int = Field(description="Максимальное количество очков здоровья персонажа.")
     current_hp: int = Field(description="Текущее количество очков здоровья персонажа.")
+    is_alive: bool = Field(description="Может ли персонаж совершать действия, жив ли он")
     ac: int = Field(description="Класс брони персонажа, представляющий его защиту.")
     is_player: bool = Field(default=False, description="True, если это игровой персонаж.")
-
     conditions: List[str] = Field(default_factory=list, description="Набор текущих состояний, влияющих на персонажа.")
-
-    # === ЭТО ИЗМЕНЕННАЯ СТРОКА ===
     inventory: List[Item] = Field(default_factory=list, description="Список предметов персонажа.")
-    
     abilities: List[Ability] = Field(default_factory=list, description="Список особых способностей персонажа.")
-    
     personality_history: str = Field(description="Подробное описание личности, предыстории и мотивации персонажа.")
     
 
 class SceneObject(BaseModel):
     """
     Pydantic schema for a general object within a scene, like a door, tree, or statue.
-    This is for background elements that characters might interact with. Remember never use this scheme to create a character or an NPC.
+    This is for background elements that characters might interact with.
     """
     name: str = Field(description="The short, identifiable name of the object (e.g., 'Large Oak Door', 'Ancient Weeping Willow').")
     description: str = Field(description="A detailed visual and sensory description of the object. What does it look, feel, or smell like?")
