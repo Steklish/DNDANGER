@@ -28,7 +28,14 @@ document.addEventListener('DOMContentLoaded', function() {
     eventSource.onmessage = function(event) {
         try {
             const data = JSON.parse(event.data);
-            updateUI(data);
+            console.log(data)
+            if (data.event == "message"){
+                addMessage(
+                    data.data, 
+                    data.sender
+                )
+            }
+            // updateUI(data);
         } catch (error) {
             console.error('Error processing update:', error);
         }
@@ -255,7 +262,6 @@ document.addEventListener('DOMContentLoaded', function() {
     sendButton.addEventListener('click', function() {
         const message = messageInput.value.trim();
         if (message) {
-            addMessage(message, character_name)
             send_interaction_request(message)
             chatMessages.scrollTop = chatMessages.scrollHeight;
             messageInput.value = '';

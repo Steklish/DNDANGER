@@ -1,21 +1,18 @@
 import json
 import random
 from dotenv import load_dotenv
-from numpy import character
-from pyparsing import Char
 from sympy import true
 from classifier import Classifier
 from generator import ObjectGenerator
 from models import *
+from server_communication.events import EventBuilder
 from utils import *
 from global_defines import (
     Colors, 
     ERROR_COLOR, 
-    WARNING_COLOR, 
     HEADER_COLOR,
     ENTITY_COLOR,
     SUCCESS_COLOR,
-    TIME_COLOR,
     INFO_COLOR,
     MAX_CONTEXT_LENGTH
 )
@@ -139,10 +136,10 @@ class ChapterLogicFight:
         random.shuffle(self.turn_order)
         print(f"{INFO_COLOR}Turn order shuffled{Colors.RESET}")
         
-        print(f"\n{HEADER_COLOR}Current Scene:{Colors.RESET}")
-        print(f"{INFO_COLOR}{str(self.scene)}{Colors.RESET}")
-        print(f"\n{HEADER_COLOR}Current Context:{Colors.RESET}")
-        print(f"{INFO_COLOR}{str(self.context)}{Colors.RESET}")
+        # print(f"\n{HEADER_COLOR}Current Scene:{Colors.RESET}")
+        # print(f"{INFO_COLOR}{str(self.scene)}{Colors.RESET}")
+        # print(f"\n{HEADER_COLOR}Current Context:{Colors.RESET}")
+        # print(f"{INFO_COLOR}{str(self.context)}{Colors.RESET}")
         
     def move_to_next_turn(self):
         self.current_turn = (self.current_turn + 1) % len(self.turn_order) # type: ignore
@@ -154,8 +151,6 @@ class ChapterLogicFight:
         for character in self.characters:
             if character.name == self.get_active_character_name():
                 return character
-
-    import json # or import yaml if you have the PyYAML library installed
 
     def get_actual_context(self) -> str:
         context_dict = {
@@ -227,18 +222,21 @@ class ChapterLogicFight:
 
         # The rest of the logic
         self.context += f"\n\n{character.name} performs action (DM's response): {narrative}" # type: ignore
+        yield EventBuilder.DM_message(narrative) # type: ignore
 
-        # Apply the changes that the LLM already identified
-        for change in changes:
+        for i, change in enumerate(changes, 1):
             if change.object_type == "character":
                 self.update_character(change.object_name, change.changes)
             elif change.object_type == "scene":
                 self.update_scene(change.object_name, change.changes)
-        
+                
+            yield EventBuilder.state_update_required(
+                update=f"{change.object_name} был обновлен ({change.changes})",
+                total=len(changes), 
+                current=i
+            )
         print(f"{SUCCESS_COLOR}All changes applied successfully{Colors.RESET}")
         self.move_to_next_turn()
-        print(narrative)
-        return narrative
     
     def apply_changes_after_turn(self, action_description : str, character : Character):
         """
@@ -288,7 +286,8 @@ class ChapterLogicFight:
         self.context =  str(self.context) + f"\n\nPlayer that controlls {character.name} asks: {question}"
         self.context += f"\n\nDM's response: {reply}"
         print(f"{SUCCESS_COLOR}🎲 DM's response:{Colors.RESET} {reply}")
-        return reply
+        yield EventBuilder.DM_message(reply) # type: ignore
+        # return reply
 
     def trim_context(self):
         self.context = self.classifier.general_text_llm_request(
@@ -334,21 +333,13 @@ class ChapterLogicFight:
         interaction += decision.reasoning # type: ignore
         result = None
         if decision.decision: # type: ignore
+            yield EventBuilder.user_intent_processed("info")
             print(f"{INFO_COLOR}Request for info {Colors.RESET}")
-            result = self.askedDM(character, interaction)
+            yield from self.askedDM(character, interaction)
         else:
+            yield EventBuilder.user_intent_processed("action")
             print(f"{INFO_COLOR}Request for action {Colors.RESET}")
-            result = self.action(character, interaction)
-        return result
-    
-    def start_turn_loop(self):
-        """
-        Starts the turn loop for the fight, allowing characters to take actions.
-        """
-        print(f"\n{HEADER_COLOR}⚔️ Starting fight in scene:{Colors.RESET} {ENTITY_COLOR}{self.scene.name if self.scene else 'Unknown Scene'}{Colors.RESET}")
-        
-        for character in self.characters:
-            print(f"\n{HEADER_COLOR}👤 {character.name}'s turn:{Colors.RESET}")
+            yield from self.action(character, interaction)
     
     def get_character_by_name(self, name:str) -> Character:
         for char in self.characters:

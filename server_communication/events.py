@@ -2,64 +2,96 @@ from typing import List
 
 
 class EventBuilder:
+
     @staticmethod
-    def keepalive(data):
-        """Create a keepalive event message.
-
-        Args:
-            data: Any data to be included in the keepalive message.
-
-        Returns:
-            dict: A keepalive event containing the provided data.
+    def user_intent_processed(decision:str):
         """
-        return {"data": data}
+        decision (действие/информация)
+        \n сообщает, какой тип запроса обрабатывается
+        """
+        return {
+            "event": "decision",
+            "decision": decision
+        }
+
 
     @staticmethod
     def lock(allowed_players: List[str]):
-        """Create a lock/unlock event message to control player turns.
+        """Создает событие блокировки/разблокировки для контроля очередности ходов игроков.
 
         Args:
-            allowed_players (List[str]): List of player names who are allowed to take actions.
+            allowed_players (List[str]): Список имен игроков, которым разрешено выполнять действия.
 
         Returns:
-            dict: A lock event containing the list of allowed players.
+            dict: Событие блокировки, содержащее список разрешенных игроков.
         """
         return {
             "event": "lock",
             "allowed_players": allowed_players
         }
+        
+    @staticmethod
+    def lock_all():
+        """
+        Создает блокировку.
+
+        Returns:
+            dict: Событие блокировки, содержащее список разрешенных игроков.
+        """
+        return {
+            "event": "lock",
+            "allowed_players": []
+        }
 
     @staticmethod
     def player_message(data: str, sender: str):
-        """Create a player message event.
+        """Создает событие сообщения от игрока.
 
         Args:
-            data (str): The message content to be sent.
-            sender (str): The name of the player sending the message.
+            data (str): Содержимое отправляемого сообщения.
+            sender (str): Имя игрока, отправляющего сообщение.
 
         Returns:
-            dict: A player message event containing the message data and sender information.
+            dict: Событие сообщения от игрока, содержащее данные сообщения и информацию об отправителе.
         """
         return {
-            "event": "player_message",
+            "event": "message",
             "data": data,
             "sender": sender
         }
 
     @staticmethod
-    def state_update_required(event: str, total: int, current: int):
-        """Create a state update event message.
+    def DM_message(data: str):
+        """Создает событие сообщения от DM (Мастера).
 
         Args:
-            event (str): The type of state update event.
-            total (int): The total value for the state.
-            current (int): The current value for the state.
+            data (str): Содержимое отправляемого сообщения.
 
         Returns:
-            dict: A state update event containing the event type and state values.
+            dict: Событие сообщения от DM, содержащее данные сообщения и информацию об отправителе.
         """
         return {
-            "event": event,
+            "event": "message",
+            "data": data,
+            "sender": "DM"
+        }
+
+
+    @staticmethod
+    def state_update_required(update: str, total: int, current: int):
+        """Создает событие-сообщение об обновлении состояния.
+
+        Args:
+
+            total (int): Общее значение для состояния.
+            current (int): Текущее значение для состояния.
+
+        Returns:
+            dict: Событие обновления состояния, содержащее тип события и значения состояния.
+        """
+        return {
+            "event": "update",
+            "object" : update,
             "total": total,
             "current": current
         }
