@@ -8,7 +8,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const menuOpen = document.getElementById('menuOpen');
     const menuClose = document.getElementById('menuClose');
     const menuItems = document.querySelectorAll('.menu-item');
-    const character_name = document.getElementById('character_name').innerHTML
+    const character_name = document.getElementById('character_name').innerHTML;
 
     // Получаем имя игрока из localStorage (установленное при логине)
     const currentPlayerName = localStorage.getItem('playerName');
@@ -21,116 +21,43 @@ document.addEventListener('DOMContentLoaded', function() {
 
     let lastMessageCount = 0; // Для отслеживания новых сообщений
 
-    // Функция обновления данных
-    function fetchUpdates() {
-        fetch('/refresh')
-            .then(response => response.json())
-            .then(data => {
-                try {
-                    console.log('Получены данные:', data); // Для отладки
+    // Создаем EventSource для получения обновлений
+    const eventSource = new EventSource("/stream");
 
-                    // Обновляем информацию о персонаже
-                    if (data.characters && data.characters.length > 0) {
-                        const playerCharacter = data.characters[0]; // Берем первого персонажа из массива
-                        
-                        // Обновляем базовую информацию
-                        const charName = document.getElementById('charName');
-                        const charHP = document.getElementById('charHP');
-                        const charAC = document.getElementById('charAC');
-                        const conditionsList = document.getElementById('conditionsList');
-                        const inventoryList = document.getElementById('inventoryList');
-                        const abilitiesList = document.getElementById('abilitiesList');
-                        const personalityHistory = document.getElementById('personalityHistory');
+    // Обрабатываем получаемые сообщения
+    eventSource.onmessage = function(event) {
+        try {
+            const data = JSON.parse(event.data);
+            updateUI(data);
+        } catch (error) {
+            console.error('Error processing update:', error);
+        }
+    };
 
-                        if (charName) charName.textContent = playerCharacter.name;
-                        if (charHP) charHP.textContent = `${playerCharacter.current_hp}/${playerCharacter.max_hp}`;
-                        if (charAC) charAC.textContent = playerCharacter.ac;
+    // Обработка ошибок подключения
+    eventSource.onerror = function(error) {
+        console.error("EventSource failed:", error);
+        eventSource.close();
+        // Попытка переподключения через 5 секунд
+        setTimeout(() => {
+            window.location.reload();
+        }, 5000);
+    };
 
-                        // Состояния
-                        if (conditionsList) {
-                            conditionsList.innerHTML = playerCharacter.conditions.length ? 
-                                playerCharacter.conditions.map(condition => `<li>${condition}</li>`).join('') : 
-                                '<li>Нет активных состояний</li>';
-                        }
-
-                        // Инвентарь
-                        if (inventoryList) {
-                            inventoryList.innerHTML = playerCharacter.inventory.map(item => `
-                                <div class="inventory-item">
-                                    <h4>${item.name} ${item.item_type ? `(${item.item_type})` : ''}</h4>
-                                    <p>${item.description}</p>
-                                    ${item.quantity ? `<p><em>Количество:</em> ${item.quantity}</p>` : ''}
-                                    ${item.weight ? `<p><em>Вес:</em> ${item.weight}</p>` : ''}
-                                    ${item.value ? `<p><em>Ценность:</em> ${item.value}</p>` : ''}
-                                    ${item.rarity ? `<p><em>Редкость:</em> ${item.rarity}</p>` : ''}
-                                    ${item.is_magical !== undefined ? `<p><em>Магический:</em> ${item.is_magical ? 'Да' : 'Нет'}</p>` : ''}
-                                    ${item.damage ? `<p><em>Урон:</em> ${item.damage} ${item.damage_type ? `(${item.damage_type})` : ''}</p>` : ''}
-                                    ${item.effect ? `<p><em>Эффект:</em> ${item.effect}</p>` : ''}
-                                    ${item.properties && item.properties.length > 0 ? `<p><em>Свойства:</em> ${item.properties.join(', ')}</p>` : ''}
-                                </div>
-                            `).join('');
-                        }
-
-                        // Способности
-                        if (abilitiesList) {
-                            abilitiesList.innerHTML = playerCharacter.abilities.map(ability => `
-                                <div class="ability-item">
-                                    <h4>${ability.name}</h4>
-                                    <p>${ability.description}</p>
-                                    ${ability.details ? `
-                                        <div class="ability-details">
-                                            <p><em>Использование:</em> ${ability.details.usage}</p>
-                                            <p><em>Тип действия:</em> ${ability.details.action_type}</p>
-                                        </div>
-                                    ` : ''}
-                                </div>
-                            `).join('');
-                        }
-
-                        // История персонажа
-                        if (personalityHistory) {
-                            personalityHistory.innerHTML = parseMarkdownAndHTML(playerCharacter.personality_history || 'История не указана');
-                        }
-                    }
-
-                    // Обновляем информацию о сцене
-                    if (data.scene) {
-                        const sceneName = document.getElementById('sceneName');
-                        const sceneDescription = document.getElementById('sceneDescription');
-                        const sceneSize = document.getElementById('sceneSize');
-                        const sceneObjects = document.getElementById('sceneObjects');
-
-                        if (sceneName) sceneName.textContent = data.scene.name;
-                        if (sceneDescription) sceneDescription.innerHTML = parseMarkdownAndHTML(data.scene.description);
-                        if (sceneSize) sceneSize.textContent = data.scene.size_description;
-                        
-                        if (sceneObjects) {
-                            sceneObjects.innerHTML = `<h4>Объекты в сцене:</h4>` + 
-                                data.scene.objects.map(obj => `
-                                    <div class="scene-object">
-                                        <h5>${obj.name}</h5>
-                                        <p>${obj.description}</p>
-                                        <p><em>Расположение:</em> ${obj.position_in_scene}</p>
-                                        <p><em>Размер:</em> ${obj.size_description}</p>
-                                        <p><em>Действия:</em> ${obj.interactions.join(', ')}</p>
-                                    </div>
-                                `).join('');
-                        }
-                    }
-
-                    // Обновляем чат
-                    if (data.chat_history) {
-                        updateChat(data.chat_history);
-                        lastMessageCount = data.chat_history.length;
-                    }
-
-                } catch (error) {
-                    console.error('Ошибка при обработке данных:', error);
-                }
-            })
-            .catch(error => {
-                console.error('Ошибка при получении обновлений:', error);
-            });
+    // Функция обновления UI
+    function updateUI(data) {
+        if (data.characters) {
+            const playerCharacter = data.characters.find(char => char.name === character_name);
+            if (playerCharacter) {
+                updateCharacterInfo(playerCharacter);
+            }
+        }
+        if (data.scene) {
+            updateSceneInfo(data.scene);
+        }
+        if (data.chat_history) {
+            updateChat(data.chat_history);
+        }
     }
 
     function addMessage(messageText, senderName) {
@@ -211,77 +138,78 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Функция обновления информации о персонаже
     function updateCharacterInfo(character) {
-        const characterDropdown = document.getElementById('characterDropdown');
-        if (!characterDropdown) return;
+        // Обновляем базовую информацию
+        const charName = document.getElementById('charName');
+        const charHP = document.getElementById('charHP');
+        const charAC = document.getElementById('charAC');
+        const conditionsList = document.getElementById('conditionsList');
 
-        let html = `
-            <h3>Character Details</h3>
-            <p><strong>Имя:</strong> ${character.name}</p>
-            <p><strong>HP:</strong> ${character.current_hp} / ${character.max_hp}</p>
-            <p><strong>AC:</strong> ${character.ac}</p>
-            
-            <h4>Способности:</h4>
-            <ul>
-                ${character.abilities.map(ability => `
-                    <li>
-                        <strong>${ability.name}</strong>: ${ability.description}
-                        ${ability.details ? `<br><em>Детали:</em> ${JSON.stringify(ability.details)}` : ''}
-                    </li>
-                `).join('')}
-            </ul>
-            
-            <h4>Инвентарь:</h4>
-            <ul>
-                ${character.inventory.map(item => `
-                    <li>
-                        <strong>${item.name}</strong> (${item.item_type})
-                        <br>${item.description}
-                        ${item.quantity !== undefined ? `<br><em>Количество:</em> ${item.quantity}` : ''}
-                        ${item.weight !== undefined ? `<br><em>Вес:</em> ${item.weight}` : ''}
-                        ${item.value !== undefined ? `<br><em>Ценность:</em> ${item.value}` : ''}
-                        ${item.rarity !== undefined ? `<br><em>Редкость:</em> ${item.rarity}` : ''}
-                        ${item.is_magical !== undefined ? `<br><em>Магический:</em> ${item.is_magical ? 'Да' : 'Нет'}` : ''}
-                        ${item.damage !== undefined ? `<br><em>Урон:</em> ${item.damage} (${item.damage_type})` : ''}
-                        ${item.armor_class !== undefined ? `<br><em>Класс брони:</em> ${item.armor_class}` : ''}
-                        ${item.effect !== undefined ? `<br><em>Эффект:</em> ${item.effect}` : ''}
-                        ${item.properties && item.properties.length > 0 ? `<br><em>Свойства:</em> ${item.properties.join(', ')}</em>` : ''}
-                    </li>
-                `).join('')}
-            </ul>
-            
-            <h4>Состояния:</h4>
-            <p>${character.conditions.length ? character.conditions.join(', ') : 'Нет активных состояний'}</p>
-            
-            <h4>История и Личность:</h4>
-            <p>${character.personality_history || 'Нет информации'}</p>
-        `;
-        characterDropdown.innerHTML = html;
+        if (charName) charName.textContent = character.name;
+        if (charHP) charHP.textContent = `${character.current_hp}/${character.max_hp}`;
+        if (charAC) charAC.textContent = character.ac;
+        if (conditionsList) {
+            conditionsList.innerHTML = character.conditions.map(condition => 
+                `<li class="condition">${condition}</li>`
+            ).join('') || 'Нет активных состояний';
+        }
+
+        // Обновляем инвентарь
+        const inventoryList = document.getElementById('inventoryList');
+        if (inventoryList) {
+            inventoryList.innerHTML = character.inventory.map(item => `                <div class="inventory-item">
+                    <div class="item-header">
+                        <strong class="name rarity-${item.rarity || 'Common'}">${item.name}</strong>
+                        <span class="keyword">${item.item_type}</span>
+                        ${item.rarity ? `<span class="rarity-${item.rarity}">(${item.rarity})</span>` : ''}</div>
+                    <p>${item.description}</p>
+                    <div class="item-details">
+                        ${item.quantity ? `<span class="item-stat">Количество: ${item.quantity}</span>` : ''}
+                        ${item.damage ? `<span class="item-stat">Урон: ${item.damage}</span>` : ''}
+                        ${item.armor_class ? `<span class="item-stat">AC: ${item.armor_class}</span>` : ''}
+                        ${item.effect ? `<span class="item-stat">Эффект: ${item.effect}</span>` : ''}
+                    </div>
+                </div>
+            `).join('') || 'Инвентарь пуст';
+        }
+
+        // Обновляем способности
+        const abilitiesList = document.getElementById('abilitiesList');
+        if (abilitiesList) {
+            abilitiesList.innerHTML = character.abilities.map(ability => `
+                <div class="ability-item">
+                    <div class="ability-header">
+                        <strong class="name">${ability.name}</strong>
+                    </div>
+                    <p>${ability.description}</p>
+                    ${ability.details ? `<div class="ability-details">${JSON.stringify(ability.details)}</div>` : ''}
+                </div>
+            `).join('') || 'Нет доступных способностей';
+        }
+
+        // Обновляем историю персонажа
+        const personalityHistory = document.getElementById('personalityHistory');
+        if (personalityHistory) {
+            personalityHistory.innerHTML = `<p>${character.personality_history || 'Нет информации о предыстории'}</p>`;
+        }
     }
 
     // Функция обновления информации о сцене
     function updateSceneInfo(scene) {
-        const sceneDropdown = document.getElementById('sceneDropdown');
-        if (!sceneDropdown) return;
+        const sceneName = document.getElementById('sceneName');
+        const sceneDescription = document.getElementById('sceneDescription');
+        const sceneObjects = document.getElementById('sceneObjects');
 
-        let html = `
-            <h3>${scene.name}</h3>
-            <p>${scene.description}</p>
-            <p><strong>Размеры:</strong> ${scene.size_description}</p>
-            
-            <h4>Объекты в сцене:</h4>
-            <ul>
-                ${scene.objects.map(obj => `
-                    <li>
-                        <strong>${obj.name}</strong>
-                        <br>${obj.description}
-                        <br><em>Размер:</em> ${obj.size_description}
-                        <br><em>Расположение:</em> ${obj.position_in_scene}
-                        <br><em>Возможные действия:</em> ${obj.interactions.join(', ')}
-                    </li>
-                `).join('')}
-            </ul>
-        `;
-        sceneDropdown.innerHTML = html;
+        if (sceneName) sceneName.textContent = scene.name;
+        if (sceneDescription) sceneDescription.textContent = scene.description;
+        if (sceneObjects) {
+            sceneObjects.innerHTML = scene.objects.map(obj => `
+                <div class="scene-object">
+                    <strong class="name">${obj.name}</strong>
+                    <p>${obj.description}</p>
+                    <p class="keyword">Взаимодействия: ${obj.interactions.join(', ')}</p>
+                </div>
+            `).join('');
+        }
     }
 
     // Открытие бокового меню
@@ -341,36 +269,13 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Функция для парсинга Markdown и HTML
-    // ! под снос
-    function parseMarkdownAndHTML(inputText) {
-        try {
-            if (typeof marked === 'undefined') {
-                console.warn('Marked library not loaded, returning raw text');
-                return inputText;
-            }
-
-            if (typeof inputText !== 'string') {
-                return '';
-            }
-            
-            const htmlContent = marked.parse(inputText);
-            
-            const container = document.createElement('div');
-            container.innerHTML = htmlContent;
-            
-            container.querySelectorAll('.html-class').forEach(element => {
-                element.style.color = 'var(--primary)';
-            });
-            
-            return container.innerHTML;
-        } catch (error) {
-            console.error('Error parsing markdown:', error);
-            return inputText || '';
-        }
-    }
-
-    // Запускаем периодическое обновление каждые 5 секунд
-    fetchUpdates(); // Первый запрос сразу
-    // setInterval(fetchUpdates, 5000); // Увеличил интервал до 5 секунд
+    // Выполняем первоначальную загрузку данных
+    fetch('/refresh')
+        .then(response => response.json())
+        .then(data => {
+            updateUI(data);
+        })
+        .catch(error => {
+            console.error('Error fetching initial data:', error);
+        });
 });

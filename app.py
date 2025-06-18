@@ -93,6 +93,25 @@ def get_info():
     }
     return jsonify(content)
 
+@app.route('/stream')
+def stream():
+    def event_stream():
+        while True:
+            # Собираем данные
+            data = {
+                "scene": chapter.scene.model_dump(),
+                "characters": [p.model_dump() for p in chapter.characters],
+                "chat_history": message_history
+            }
+            
+            # Форматируем данные как SSE сообщение
+            yield f"data: {json.dumps(data)}\n\n"
+            
+            # Пауза между обновлениями
+            time.sleep(1)
+    
+    return Response(event_stream(), mimetype='text/event-stream')
+
 # Запускаем приложение в режиме отладки, если файл запущен напрямую
 if __name__ == '__main__':
     
