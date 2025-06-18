@@ -10,6 +10,14 @@
     --keyword: #d3a67a;
     --name: #adcd84;
     --condition: #a9a8e5;
+    --header-height: 60px;
+    --rarity-common: #b4b4b4;
+    --rarity-uncommon: #1eff00;
+    --rarity-rare: #0070dd;
+    --rarity-very-rare: #a335ee;
+    --rarity-legendary: #ff8000;
+    --rarity-artifact: #e6cc80;
+    --rarity-unique: #ff0000;
 }
 
 * {
@@ -38,10 +46,22 @@
 
 body {
     height: 100vh;
+    margin: 0;
+    padding: 0;
     background-color: var(--bg-dark);
     color: var(--text-primary);
-    display: flex;
+    font-family: "Cormorant Garamond", serif;
+    display: grid;
+    grid-template-rows: auto 1fr;
     overflow: hidden;
+}
+
+.login-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
 }
 
 /* Side Menu */
@@ -413,4 +433,328 @@ body {
     .main-content {
         margin-left: 0 !important; /* Принудительно убираем отступ на мобильных */
     }
-}
+}        .login-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background-color: var(--bg-dark);
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        form {
+            background-color: var(--bg-card);
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            min-width: 300px;
+        }
+
+        label {
+            margin-bottom: 10px;
+            display: block;
+            font-size: 1.2em;
+        }
+
+        input {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 20px;
+            border: none;
+            border-radius: 4px;
+            background-color: var(--bg-surface);
+            color: var(--text-primary);
+        }
+
+        .buttons-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+        }
+
+        button {
+            padding: 10px 23px;
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1em;
+        }
+
+        button.admin-button {
+            background-color: var(--bg-surface);
+            color: var(--text-secondary);
+            font-size: 0.9em;
+        }
+
+        button:hover {
+            background-color: var(--primary-dark);
+        }
+
+        button.admin-button:hover {
+            background-color: var(--bg-card);
+            color: var(--text-primary);
+        }        .header {
+            background-color: var(--bg-card);
+            padding: 10px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .header h1 {
+            color: var(--primary);
+            margin: 0;
+            font-size: 24px;
+        }
+
+        .main-container {
+            display: grid;
+            grid-template-columns: 300px 1fr 400px;
+            gap: 20px;
+            padding: 20px;
+            height: calc(100vh - var(--header-height));
+            overflow: hidden;
+        }
+
+        .turn-panel, .scene-panel {
+            background-color: var(--bg-card);
+            border-radius: 8px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .turn-panel {
+            gap: 10px;
+        }
+
+        .turn-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--bg-surface);
+        }
+
+        .turn-list {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .turn-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px;
+            margin: 4px 0;
+            background-color: var(--bg-surface);
+            border-radius: 4px;
+        }
+
+        .turn-item.active {
+            background-color: var(--primary);
+            color: white;
+        }
+
+        .characters-panel {
+            overflow-y: auto;
+            padding: 0 10px;
+        }
+
+        .character-card {
+            background-color: var(--bg-card);
+            margin-bottom: 15px;
+            border-radius: 8px;
+            padding: 15px;
+        }
+
+        .char-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .hp-bar {
+            width: 100%;
+            height: 8px;
+            background-color: var(--bg-surface);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .hp-bar-inner {
+            height: 100%;
+            background-color: var(--primary);
+            transition: width 0.3s ease;
+        }
+
+        .stats-row {
+            display: flex;
+            gap: 10px;
+            margin: 10px 0;
+        }
+
+        .stat-item {
+            background-color: var(--bg-surface);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            background-color: var(--primary);
+            color: white;
+            cursor: pointer;
+        }
+
+        .btn:hover {
+            background-color: var(--primary-dark);
+        }
+
+        .scene-content {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .scene-objects {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .scene-object {
+            background-color: var(--bg-surface);
+            padding: 10px;
+            border-radius: 4px;
+        }
+
+        .char-tabs {
+            display: flex;
+            gap: 8px;
+            margin: 15px 0;
+        }
+
+        .tab-btn {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            background-color: var(--bg-surface);
+            color: var(--text-primary);
+            cursor: pointer;
+            font-size: 0.9em;
+        }
+
+        .tab-btn.active {
+            background-color: var(--primary);
+            color: white;
+        }
+
+        .tab-content {
+            background-color: var(--bg-surface);
+            border-radius: 4px;
+            padding: 12px;
+            margin-top: 10px;
+        }
+
+        .ability-item, .inventory-item {
+            background-color: var(--bg-card);
+            border-radius: 4px;
+            padding: 10px;
+            margin-bottom: 8px;
+        }
+
+        .ability-header, .item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+
+        .item-details {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin: 8px 0;
+        }
+
+        .item-stat {
+            background-color: var(--bg-surface);
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 0.85em;
+        }
+
+        .item-effect {
+            font-style: italic;
+            color: var(--text-secondary);
+            margin: 5px 0;
+        }
+
+        .item-properties {
+            font-size: 0.9em;
+            color: var(--text-secondary);
+        }
+
+        .conditions {
+            color: var(--primary);
+            font-weight: 500;
+        }
+
+        .scene-info-scroll {
+            max-height: 400px;
+            overflow-y: auto;
+            padding-right: 10px;
+        }
+
+        .scene-info-scroll::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .scene-info-scroll::-webkit-scrollbar-track {
+            background: var(--bg-surface);
+            border-radius: 3px;
+        }
+
+        .scene-info-scroll::-webkit-scrollbar-thumb {
+            background: var(--primary);
+            border-radius: 3px;
+        }
+
+        #sceneDescription {
+            white-space: pre-wrap;
+            line-height: 1.4;
+        }
+
+        #sceneObjects {
+            margin-top: 15px;
+        }
+
+        /* Классы редкости предметов */
+        .rarity-Common { color: var(--rarity-common); }
+        .rarity-Uncommon { color: var(--rarity-uncommon); }
+        .rarity-Rare { color: var(--rarity-rare); }
+        .rarity-Very-Rare { color: var(--rarity-very-rare); }
+        .rarity-Legendary { color: var(--rarity-legendary); }
+        .rarity-Artifact { color: var(--rarity-artifact); }
+        .rarity-Unique { color: var(--rarity-unique); }
+
+        /* Стили для карточек предметов с редкостью */
+        .inventory-item .item-header .name.rarity-Common { text-shadow: 0 0 2px var(--rarity-common); }
+        .inventory-item .item-header .name.rarity-Uncommon { text-shadow: 0 0 2px var(--rarity-uncommon); }
+        .inventory-item .item-header .name.rarity-Rare { text-shadow: 0 0 2px var(--rarity-rare); }
+        .inventory-item .item-header .name.rarity-Very-Rare { text-shadow: 0 0 2px var(--rarity-very-rare); }
+        .inventory-item .item-header .name.rarity-Legendary { text-shadow: 0 0 2px var(--rarity-legendary); }
+        .inventory-item .item-header .name.rarity-Artifact { text-shadow: 0 0 2px var(--rarity-artifact); }
+        .inventory-item .item-header .name.rarity-Unique { text-shadow: 0 0 2px var(--rarity-unique); }
