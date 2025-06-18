@@ -69,7 +69,8 @@ class Character(BaseModel):
     inventory: List[Item] = Field(default_factory=list, description="Список предметов персонажа.")
     abilities: List[Ability] = Field(default_factory=list, description="Список особых способностей персонажа.")
     personality_history: str = Field(description="Подробное описание личности, предыстории и мотивации персонажа.")
-    
+    appearance: str = Field(description="Подробное описание внешности персонажа: черты лица, телосложение, волосы, глаза и т.д.")
+    clothing_and_cosmetics: str = Field(description="Описание одежды, украшений, макияжа и других косметических деталей персонажа.")
 
 class SceneObject(BaseModel):
     """

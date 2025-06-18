@@ -24,7 +24,7 @@ global chapter
 chapter = ChapterLogicFight(
     context = context,
     characters = [
-        generator.generate(Character, "Борис Бритва with full hp (50 hp) and a single dager (player character)", context, "Russian"),
+        generator.generate(Character, "Борис Квадробер with full hp (50 hp) (player character) кот, которого ведьма превратила в человека (ведьма была его хозяйкой, от которой он позже сбежал), на нем него только тряпка вокруг члена и ничего больше. Среднее телосложение, черные кошачьи ушки. Нижние ноги скорее кошачь, чем человеческие. Густая шерсть по всему телу. Усы на лице. Хвост черный. У него гетерохромя с ожним глазом зеленым, а вторым синим. У него острые зубы и когти. Класс персонажа - плут(способности соответствующие). Любит рыбу и не любит молоко. Отзывается на кличку 'Барсик' - сокрощенно от 'Борис'.", context, "Russian"),
         generator.generate(Character, "random monster with full hp (50 hp) and some magic spells (enemy NPC)", context, "Russian")
     ]
 )
