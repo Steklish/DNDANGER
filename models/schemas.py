@@ -1,11 +1,6 @@
-# schemas.py (Обновленный класс Character)
-
 from enum import Enum
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional
-
-# --- Перечисления и другие классы (Item, Ability) остаются без изменений ---
-# (Они включены здесь для полноты файла)
 
 class ItemType(str, Enum):
     # Перечисление типов предметов в игре
@@ -53,7 +48,6 @@ class Ability(BaseModel):
     description: str = Field(description="Четкое описание действия способности.")
     details: Dict[str, Any] = Field(default_factory=dict, description="Словарь для дополнительных деталей способности.")
 
-# --- МОДИФИЦИРОВАННЫЙ КЛАСС ПЕРСОНАЖА ---
 
 class Character(BaseModel):
     """
@@ -71,7 +65,8 @@ class Character(BaseModel):
     personality_history: str = Field(description="Подробное описание личности, предыстории и мотивации персонажа.")
     appearance: str = Field(description="Подробное описание внешности персонажа: черты лица, телосложение, волосы, глаза и т.д.")
     clothing_and_cosmetics: str = Field(description="Описание одежды, украшений, макияжа и других косметических деталей персонажа.")
-
+    gender: str = Field(description="Пол персонажа. (Возможные пояснения, если пол не является стандартным или не существует для данного существа)")
+    
 class SceneObject(BaseModel):
     """
     Pydantic schema for a general object within a scene, like a door, tree, or statue.

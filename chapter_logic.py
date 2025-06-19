@@ -135,10 +135,6 @@ class ChapterLogicFight:
         random.shuffle(self.turn_order)
         print(f"{INFO_COLOR}Turn order shuffled{Colors.RESET}")
         
-        # print(f"\n{HEADER_COLOR}Current Scene:{Colors.RESET}")
-        # print(f"{INFO_COLOR}{str(self.scene)}{Colors.RESET}")
-        # print(f"\n{HEADER_COLOR}Current Context:{Colors.RESET}")
-        # print(f"{INFO_COLOR}{str(self.context)}{Colors.RESET}")
         
     def move_to_next_turn(self):
         self.current_turn = (self.current_turn + 1) % len(self.turn_order) # type: ignore
@@ -162,11 +158,13 @@ class ChapterLogicFight:
             }
         }
 
-        return f"""
+        data =  f"""
     <CONTEXT_DATA>
     {json.dumps(context_dict, indent=2, ensure_ascii=False)}
     </CONTEXT_DATA>
     """
+        # print(data)
+        return data
        
     def get_action_prompt(self, character: Character, action_text: str) -> str:
         return f"""
@@ -176,8 +174,8 @@ class ChapterLogicFight:
 
 <RULES>
 1.  **Оценивай логику:** Учитывай силу персонажа, его оружие, броню цели, окружение и любые состояния (например, <span class="condition">ослеплен</span>). Мощный удар топора должен наносить больше урона, чем укол кинжалом. Попасть в бронированного рыцаря сложнее, чем в гоблина.
-2.  **Будь беспристрастен:** Не подсуживай ни игрокам, ни врагам. Исход должен быть логичным следствием действия в мире игры.
-3.  **Определяй механику:** Одновременно с созданием описания, ты должен точно определить механические изменения. Если персонаж получает урон, укажи это в `structural_changes`. Если он поджигает стол, это изменение и для персонажа (потратил факел), и для сцены (появился горящий стол).
+2.  **Будь беспристрастен:** Не подсуживай ни игрокам, ни врагам. Исход должен быть логичным следствием действия в мире игры. Следи за тем, чтобы действия, которое совершает персонаж было ему позволено с точки зрения правил и логики (например, персонаж не может ударить мечом, если у него нет меча или он спрятан глубуко в сумке). Если игрок пытается совершить действие, которое недопустимо, дйствия не должно иметь эффекта.
+3.  **Определяй механику:** Одновременно с созданием описания, ты должен точно определить механические изменения. Если персонаж получает урон, укажи это в `structural_changes`. Если он поджигает стол, это изменение и для персонажа (потратил факел), и для сцены (появился горящий стол) никогда не забывай добавить описание изменения.
 </RULES>
 
 <OUTPUT_FORMAT>
@@ -187,7 +185,8 @@ class ChapterLogicFight:
     -   `<span class="damage">описание урона</span>` для любого вреда.
     -   `<span class="heal">описание исцеления</span>` для восстановления здоровья.
     -   `<span class="condition">описание состояния</span>` для наложения эффектов.
--   `structural_changes`: Список объектов, описывающих конкретные изменения.
+-   `structural_changes`: Список объектов, описывающих конкретные изменения (если изменения отсутствуют - оставить пустым).
+-   `is_legal` : Является ли действие игрока допустимым с точки зрения правил.
 </OUTPUT_FORMAT>
 
 <CONTEXT>
@@ -210,6 +209,8 @@ class ChapterLogicFight:
         print(f"\n{ENTITY_COLOR}{character.name}{Colors.RESET} {INFO_COLOR}performs action:{Colors.RESET} {action_text}")
 
         # Use a generator that can directly output a Pydantic object
+        # лол
+        # это вообще не та функция, которую я сюда планировал
         outcome: ActionOutcome = self.generator.generate(
             pydantic_model=ActionOutcome,
             prompt=self.get_action_prompt(character, action_text),
@@ -223,19 +224,22 @@ class ChapterLogicFight:
         self.context += f"\n\n{character.name} performs action (DM's response): {narrative}" # type: ignore
         yield EventBuilder.DM_message(narrative) # type: ignore
 
-        for i, change in enumerate(changes, 1):
-            if change.object_type == "character":
-                self.update_character(change.object_name, change.changes)
-            elif change.object_type == "scene":
-                self.update_scene(change.object_name, change.changes)
-                
-            yield EventBuilder.state_update_required(
-                update=f"{change.object_name} был обновлен ({change.changes})",
-                total=len(changes), 
-                current=i
-            )
-        print(f"{SUCCESS_COLOR}All changes applied successfully{Colors.RESET}")
-        self.move_to_next_turn()
+        if outcome.is_legal:
+            for i, change in enumerate(changes, 1):
+                if change.object_type == "character":
+                    self.update_character(change.object_name, change.changes)
+                elif change.object_type == "scene":
+                    self.update_scene(change.object_name, change.changes)
+                    
+                yield EventBuilder.state_update_required(
+                    update=f"{change.object_name} был обновлен ({change.changes})",
+                    total=len(changes), 
+                    current=i
+                )
+            print(f"{SUCCESS_COLOR}All changes applied successfully{Colors.RESET}")    
+            self.move_to_next_turn()
+        else:
+            yield EventBuilder.alert("Not a legal action reqired")
     
     def apply_changes_after_turn(self, action_description : str, character : Character):
         """
@@ -276,10 +280,12 @@ class ChapterLogicFight:
         print(f"\n{ENTITY_COLOR}{character.name}{Colors.RESET} {INFO_COLOR}asks:{Colors.RESET} {question}")
         prompt = f"""
         {global_defines.dungeon_master_core_prompt}
-        Ответь на вопрос, выделяя ключевые слова тегом <span class='keyword'>ключевые слова</span> и выделяя имена тегом <span class='name'>имена</span> . НЕ используй MarkDown теги.
-        Контекст:
+        [current task]
+        Ответь на запрос игрока, выделяя ключевые слова тегом <span class='keyword'>ключевые слова</span> и выделяя имена тегом <span class='name'>имена</span>. Сейчас ты только отвечаешь игроку, и, значит, твой ответ не должен влиятьь на мир или персонажей. 
+        [Контекст]
         {self.get_actual_context()}
-        Вопрос: "{question}"
+        [Запрос] 
+        "{question}"
         """
         reply = self.classifier.general_text_llm_request(prompt)
         self.context =  str(self.context) + f"\n\nPlayer that controlls {character.name} asks: {question}"
@@ -319,10 +325,8 @@ class ChapterLogicFight:
         """
         decision : ClassifyInformationOrActionRequest = self.classifier.generate(
             contents=f"""
-            context:
-            {self.context}
-            \nplayer's character:
-            {str(character)}
+            You need to classify players dnd request to DM (master). 
+            В `decision` TRUE, если запрос содержит информацию или взаимодействие с мастером подземелья, FALSE, если запрос содержит описание действия от лица персонажа в D&D.
             player's request:
             {interaction}
             """, 
@@ -363,9 +367,9 @@ class ChapterLogicFight:
             self.context = updated_context
             print(f"{SUCCESS_COLOR}✨ Context updated{Colors.RESET}")
 
-    def enemy_turn(self):
+    def NPC_turn(self):
         """
-        Handles the enemy's turn in the fight.
+        Handles the npc's turn in the fight.
         """
         print(f"\n{HEADER_COLOR}NPC's turn:{Colors.RESET}")
         # Here you can implement enemy actions, AI logic, etc.
@@ -397,7 +401,7 @@ class ChapterLogicFight:
 Твой ответ:
 """
         NPC_action = self.classifier.general_text_llm_request(NPC_action_prompt)
-        self.action(self.get_active_character(), NPC_action) # type: ignore
+        yield from self.action(self.get_active_character(), NPC_action) # type: ignore
         
         
 if __name__ == "__main__":
@@ -449,4 +453,4 @@ if __name__ == "__main__":
                 continue
             chapter.process_interaction(chapter.get_active_character(), user_input) # type: ignore
         else:
-            dm_action = chapter.enemy_turn()
+            dm_action = chapter.NPC_turn()

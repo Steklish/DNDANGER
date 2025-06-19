@@ -1,5 +1,6 @@
 import json
 import queue
+from typing import Any, Generator
 
 from chapter_logic import ChapterLogicFight
 from generator import ObjectGenerator
@@ -28,11 +29,18 @@ class Game:
             context = self.context,
             characters = [
                 self.generator.generate(Character, "Борис Квадробер with full hp (50 hp) (player character) кот, которого ведьма превратила в человека (ведьма была его хозяйкой, от которой он позже сбежал), на нем него только тряпка вокруг члена и ничего больше. Среднее телосложение, черные кошачьи ушки. Нижние ноги скорее кошачь, чем человеческие. Густая шерсть по всему телу. Усы на лице. Хвост черный. У него гетерохромя с ожним глазом зеленым, а вторым синим. У него острые зубы и когти. Класс персонажа - плут(способности соответствующие). Любит рыбу и не любит молоко. Отзывается на кличку 'Барсик' - сокрощенно от 'Борис'.", self.context, "Russian"),
-                self.generator.generate(Character, "Яша Лава with full hp (50 hp) (player character)", self.context, "Russian"),
+                self.generator.generate(Character, "Яша Лава with full hp (50 hp) random inventory (non-player character)", self.context, "Russian"),
                 # self.generator.generate(Character, "random monster with full hp (50 hp) and some magic spells (enemy NPC)", self.context, "Russian")
             ]
         )
         self.chapter.setup_fight()
+        self.announce(EventBuilder.DM_message(self.chapter.scene.description)) # type: ignore
+        message = {
+            "message_text": self.chapter.scene.description, # type: ignore
+            "sender_name": "DM"
+        }
+        self.add_message_to_history(message)
+        
         
     def listen(self):
         """
@@ -62,6 +70,8 @@ class Game:
     def announce(self, msg):
         """
         Puts a message into all active listener queues.
+        \n
+        EventBuilder structures hanler 
         """
         # We need to format the message for SSE
         formatted_msg = f"data: {json.dumps(msg)}\n\n"
@@ -92,21 +102,21 @@ class Game:
         
         self.announce(EventBuilder.lock_all())
         
-        for event  in self.chapter.process_interaction(self.chapter.get_character_by_name(character_name), interaction):
+        player_to_game_interactions = self.chapter.process_interaction(self.chapter.get_character_by_name(character_name), interaction)
+        self.announce_from_the_game(player_to_game_interactions)     
+        self.allow_current_character_turn()
+            
+    def announce_from_the_game(self, generator):
+        for event  in generator:
             print("Event recieved from the game:")
             print(event)
-            # if "event" in event and event["event"] == "message":
             self.announce(event)
             if event["event"] == "message" and event["sender"] == "DM":
                 message = {
                     "message_text": event["data"],
                     "sender_name": event["sender"]
                 }
-                self.add_message_to_history(message)     
-        
-        self.announce(EventBuilder.lock([self.chapter.get_active_character_name()]))
-            
-    
+                self.add_message_to_history(message)
 
     def add_message_to_history(self, message):
         """
@@ -115,3 +125,13 @@ class Game:
         self.message_history.append(message)
         if len(self.message_history) > MAX_MESSAGE_HISTORY_LENGTH:
             self.message_history.pop(0)
+            
+    def allow_current_character_turn(self):
+        cur_character = self.chapter.get_active_character()
+        if cur_character.is_alive and cur_character.is_player:
+            self.announce(EventBuilder.lock([self.chapter.get_active_character_name()]))
+        elif not cur_character.is_alive:
+            self.announce(EventBuilder.alert(f"Player {cur_character.name} is unable to take turns..."))
+        elif not cur_character.is_player:
+            NPC_interaction = self.chapter.NPC_turn()
+            self.announce_from_the_game(NPC_interaction)

@@ -95,3 +95,16 @@ class EventBuilder:
             "total": total,
             "current": current
         }
+        
+    @staticmethod
+    def alert(data: str):
+        """Создает событие сообщения от сервера.
+
+        Args:
+            data (str): Содержимое отправляемого сообщения.
+        """
+        return {
+            "event": "alert",
+            "data": data,
+            "sender": "server"
+        }

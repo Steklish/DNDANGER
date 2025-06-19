@@ -45,3 +45,4 @@ class ActionOutcome(BaseModel):
     """The result of a character's action, including the narrative and its mechanical effects."""
     narrative_description: str = Field(description="The rich, narrative description of the action's outcome, written for the player. Must use the required HTML tags for damage, healing, etc.")
     structural_changes: List[ChangesToMake] = Field(description="A list of specific, mechanical changes to characters or the scene resulting from the action.")
+    is_legal: bool = Field(description="Whether the action performed was permissible within the rules or context of the game")

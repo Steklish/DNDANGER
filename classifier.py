@@ -39,10 +39,8 @@ class Classifier:
                     "response_schema": pydantic_model,
                 }
             )
-            print(f"{SUCCESS_COLOR}✅ Content generated successfully{Colors.RESET}")
             return response.parsed
         except Exception as e:
-            print(f"{ERROR_COLOR}❌ Error generating content:{Colors.RESET} {e}")
             return None
        
     def generate_list(self, contents: str, pydantic_model: Type[T], response_mime_type: str = "application/json"):
@@ -56,10 +54,8 @@ class Classifier:
                     "response_schema": list[pydantic_model],
                 }
             )
-            print(f"{SUCCESS_COLOR}✅ Content generated successfully{Colors.RESET}")
             return response.parsed
         except Exception as e:
-            print(f"{ERROR_COLOR}❌ Error generating content:{Colors.RESET} {e}")
             return None
         
         
@@ -100,18 +96,11 @@ class Classifier:
 					"response_mime_type": response_mime_type,
 				}
             )
-            print(f"{SUCCESS_COLOR}✅ Response received{Colors.RESET}")
-            
-            # It's good practice to check if the response is actually there
-            # before returning it, as it could be blocked by safety filters.
             if response.text:
                 return response.text
             else:
-                print(f"{ERROR_COLOR}❌ Received an empty response (possibly blocked by safety filters).{Colors.RESET}")
                 return None
-
         except Exception as e:
-            print(f"{ERROR_COLOR}❌ Error in text request: {e}{Colors.RESET}")
             return None
         
         
