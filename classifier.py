@@ -1,10 +1,9 @@
 import os
 from dotenv import load_dotenv
 from google import genai
-from langcodes import Language
 from pydantic import BaseModel
 from typing import Type, TypeVar, Optional
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel
 from global_defines import (
     Colors, 
     ERROR_COLOR, 

@@ -1,9 +1,6 @@
 import json
 import queue
 
-from h11 import Event
-from sympy import im
-from wasabi import msg
 from chapter_logic import ChapterLogicFight
 from generator import ObjectGenerator
 from models.schemas import Character

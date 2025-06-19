@@ -1,7 +1,6 @@
 import json
 import random
 from dotenv import load_dotenv
-from sympy import true
 from classifier import Classifier
 from generator import ObjectGenerator
 from models import *
@@ -442,7 +441,7 @@ if __name__ == "__main__":
             print(c.model_dump_json(indent=2))
         print(chapter.scene.model_dump_json(indent=2)) # type: ignore
         print(chapter.turn_order)
-    while true:
+    while True:
         if chapter.get_active_character().is_player:
             user_input = input(f"{ENTITY_COLOR}{chapter.get_active_character_name()} -->{Colors.RESET}  ")
             if user_input == "?": 
