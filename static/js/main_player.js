@@ -1,5 +1,6 @@
 // Инициализируем обработчики событий после загрузки DOM
 document.addEventListener('DOMContentLoaded', function() {
+    
     // Получаем ссылки на основные элементы интерфейса
     const messageInput = document.getElementById('message-input');
     const sendButton = document.getElementById('send-button');
@@ -35,6 +36,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     data.sender
                 )
             }
+            if (data.event == "alert"){
+                addMessage(
+                    data.data, 
+                    "System"
+                )
+            }
             // updateUI(data);
         } catch (error) {
             console.error('Error processing update:', error);
@@ -68,30 +75,34 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function addMessage(messageText, senderName) {
-        let new_message = ''
+        // sent / recieved
+        let message_src = ""
+        
         if (senderName == character_name){
-            new_message = `
-                <div class="message sent">
-                    <div class="sender-name">${senderName}</div>
-                    <div class="message-text">
-                    ${marked.parse(messageText.trimStart())}
-                    </div>
-                </div>
-                `
+            message_src = "sent"
         }
         else{
-            new_message = `
-                <div class="message received">
-                    <div class="sender-name">${senderName}</div>
-                    <div class="message-text">
-                    ${marked.parse(messageText.trimStart())}
-                    </div>
-                </div>
-                `
+            message_src = "received"
         }
+
+        let is_DM = ""
+        if (senderName == "DM") {is_DM = "DM_message"}
+        let new_message = `
+        <div class="message ${message_src} ${is_DM}">
+            ${senderName != character_name ? `<div class="sender-name">${senderName}</div>` : ""} 
+            <div class="message-text">
+            ${marked.parse(messageText.trimStart())}
+            </div>
+        </div>
+        `
             // console.log(messageText)
         chatMessages.innerHTML += new_message
-        return
+        const lastMessage = chatMessages.lastElementChild;
+
+        if (lastMessage) {
+            // Tell the browser to scroll so that this element is in view
+            lastMessage.scrollIntoView({ behavior: 'smooth' }); // 'smooth' is optional for a nice animation
+        }
     }
 
     function send_interaction_request(text){
