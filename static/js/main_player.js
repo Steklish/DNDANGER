@@ -1,5 +1,5 @@
 // Инициализируем обработчики событий после загрузки DOM
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
     
     // Получаем ссылки на основные элементы интерфейса
     const messageInput = document.getElementById('message-input');
@@ -14,11 +14,17 @@ document.addEventListener('DOMContentLoaded', function() {
     // Получаем имя игрока из localStorage (установленное при логине)
     const currentPlayerName = localStorage.getItem('playerName');
     
+    if (await get_current_character() != character_name){
+        console.log("Other player's turn")
+        lock_input()
+    }
     // Если имя не установлено, перенаправляем на страницу логина
     if (!currentPlayerName) {
         window.location.href = '/login.html';
         return;
     }
+
+    
 
     let lastMessageCount = 0; // Для отслеживания новых сообщений
 
@@ -39,9 +45,18 @@ document.addEventListener('DOMContentLoaded', function() {
             if (data.event == "alert"){
                 addMessage(
                     data.data, 
-                    "System"
+                    "system"
                 )
             }
+            if (data.event == "lock"){
+                if (data.allowed_players.includes(character_name)){
+                    unlock_input()
+                }
+                else {
+                    lock_input(data.allowed_players.length != 0)
+                }
+            }
+
             // updateUI(data);
         } catch (error) {
             console.error('Error processing update:', error);
@@ -57,6 +72,29 @@ document.addEventListener('DOMContentLoaded', function() {
             window.location.reload();
         }, 5000);
     };
+
+
+    function unlock_input(){
+        messageInput.disabled = false
+        sendButton.disabled = false
+        messageInput.placeholder="Type a message..."
+    }
+
+    async function get_current_character(){
+        let response = await fetch('/get_current_character')
+        let name = await response.text()
+        console.log(name)
+        return name
+    }
+
+    async function lock_input(is_waiting = true) {
+        messageInput.disabled = true
+        sendButton.disabled = true
+        messageInput.placeholder = is_waiting 
+            ? `Wait for your turn (${await get_current_character()}'s turn)...` 
+            : `Processing something...`;
+    }
+
 
     // Функция обновления UI
     function updateUI(data) {
@@ -75,33 +113,43 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function addMessage(messageText, senderName) {
-        // sent / recieved
-        let message_src = ""
-        
-        if (senderName == character_name){
-            message_src = "sent"
+        const scrollThreshold = 10; 
+        const isScrolledToBottom = chatMessages.scrollHeight - chatMessages.clientHeight <= chatMessages.scrollTop + scrollThreshold;
+        if (senderName == "system"){
+            let new_message = `
+            <div class="message-system">
+                <div class="message-text-system">
+                ${messageText}
+                </div>
+            </div>`;
+            chatMessages.innerHTML += new_message;
         }
         else{
-            message_src = "received"
+            let message_src = "";
+            if (senderName == character_name) {
+                message_src = "sent";
+            } else {
+                message_src = "received";
+            }
+    
+            let is_DM = "";
+            if (senderName == "DM") { is_DM = "DM_message" }
+    
+            let new_message = `
+            <div class="message ${message_src} ${is_DM}">
+                ${senderName != character_name ? `<div class="sender-name">${senderName}</div>` : ""} 
+                <div class="message-text">
+                ${marked.parse(messageText.trimStart())}
+                </div>
+            </div>
+            `;
+            chatMessages.innerHTML += new_message;
         }
 
-        let is_DM = ""
-        if (senderName == "DM") {is_DM = "DM_message"}
-        let new_message = `
-        <div class="message ${message_src} ${is_DM}">
-            ${senderName != character_name ? `<div class="sender-name">${senderName}</div>` : ""} 
-            <div class="message-text">
-            ${marked.parse(messageText.trimStart())}
-            </div>
-        </div>
-        `
-            // console.log(messageText)
-        chatMessages.innerHTML += new_message
-        const lastMessage = chatMessages.lastElementChild;
-
-        if (lastMessage) {
-            // Tell the browser to scroll so that this element is in view
-            lastMessage.scrollIntoView({ behavior: 'smooth' }); // 'smooth' is optional for a nice animation
+        // --- Scroll down ONLY if the user was already at the bottom ---
+        if (isScrolledToBottom) {
+            // You can use scrollIntoView on the new last element...
+            chatMessages.lastElementChild.scrollIntoView({ behavior: 'smooth' });
         }
     }
 

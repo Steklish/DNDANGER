@@ -26,7 +26,7 @@ class Classifier:
     """
     def __init__(self):
         self.client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
-        self.model = os.getenv("GEMINI_MODEL_DUMB", "gemini-2.0-flash")
+        self.model = os.getenv("GEMINI_MODEL_DUMB")
         
     def generate(self, contents: str, pydantic_model: Type[T], response_mime_type: str = "application/json"):
         try:

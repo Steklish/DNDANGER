@@ -20,18 +20,17 @@
     --rarity-artifact: #e6cc80;
     --rarity-unique: #ff0000;
 }
+@import url(
+    'https://fonts.googleapis.com/css?family=Roboto&display=swap'
+    );
+
 
 * {
     box-sizing: border-box;
-    font-family: "Cormorant Garamond", serif;
-    font-optical-sizing: auto;
-    font-weight: 100;
-    font-style: normal;
-    font-size: 20px;
     margin: 0;
+    font-family: "Cormorant Garamond", serif;
+    font-size: 20px;
     padding: 0;
-    font-weight: 400;
-    font-style: normal;
 }
 .keyword{
     color: var(--keyword);
@@ -50,8 +49,7 @@ body {
     margin: 0;
     padding: 0;
     background-color: var(--bg-dark);
-    color: var(--text-primary);
-    font-family: "Cormorant Garamond", serif;
+    color: var(--text-primary);  
     display: grid;
     grid-template-rows: auto 1fr;
     overflow: hidden;
@@ -200,6 +198,53 @@ body {
     display: block;
 }
 
+/* --- Added styles for the select element --- */
+select {
+    /* Style to match the input fields */
+    width: 100%;
+    padding: 10px 40px 10px 10px; /* Extra right padding for the custom arrow */
+    border: 1px solid var(--divider);
+    border-radius: 4px;
+    background-color: var(--bg-surface);
+    color: var(--text-primary);
+    margin-bottom: 15px;
+    font-size: 1em;
+    cursor: pointer;
+    transition: border-color 0.2s, box-shadow 0.2s;
+
+    /* Remove the default browser appearance */
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+
+    /* Add a custom arrow using an SVG background image */
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='%23999' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 15px center;
+    background-size: 1em;
+}
+
+/* Style for the placeholder text ("Select your username") */
+select:required:invalid {
+    color: var(--text-secondary);
+}
+
+/* Style for the dropdown options list (limited browser support) */
+select option {
+    background: var(--bg-card);
+    color: var(--text-primary);
+}
+
+/* Hover and Focus states for better interactivity */
+select:hover {
+    border-color: var(--primary-dark);
+}
+
+select:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
 .dropdown-content {
     padding: 15px;
     background-color: var(--bg-surface);
@@ -298,6 +343,17 @@ body {
     word-wrap: break-word;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
     position: relative;
+}
+
+.message-system {
+    width: 100%;
+    border-radius: 4px;
+    word-wrap: break-word;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    position: relative;
+    text-align: center;
+    background-color: var(--bg-card);
+    color: var(--text-secondary);
 }
 
 .received {
@@ -405,6 +461,33 @@ body {
     background-color: var(--primary-dark);
 }
 
+/* --- INACTIVE STYLES --- */
+
+/* Style for the disabled message input field */
+#message-input:disabled {
+    background-color: var(--bg-card); /* Use a more recessed, darker background */
+    color: var(--text-secondary);     /* Mute the text color */
+    cursor: not-allowed;              /* Show a "not allowed" cursor on hover */
+}
+
+/* Ensure the placeholder text is also muted */
+#message-input:disabled::placeholder {
+    color: var(--text-secondary);
+    opacity: 0.7; /* Make it even more faint */
+}
+
+/* Style for the disabled send button */
+#send-button:disabled {
+    background-color: var(--bg-surface); /* Use a dull, non-interactive color */
+    color: var(--text-secondary);        /* Mute the icon color */
+    cursor: not-allowed;                 /* Show a "not allowed" cursor */
+}
+
+/* Optional: Explicitly remove the hover effect when disabled */
+#send-button:disabled:hover {
+    background-color: var(--bg-surface); /* Ensures the color does not change on hover */
+}
+
 /* Custom Scrollbars */
 ::-webkit-scrollbar {
     width: 8px;
@@ -475,7 +558,6 @@ body {
         input {
             width: 100%;
             padding: 10px;
-            margin-bottom: 20px;
             border: none;
             border-radius: 4px;
             background-color: var(--bg-surface);

@@ -1,15 +1,15 @@
 # Импортируем необходимые библиотеки Flask для веб-приложения
 from re import I
 from dotenv import load_dotenv
-from flask import Flask, jsonify, render_template, Response
+from flask import Flask, jsonify, make_response, render_template, Response
 from models import *
 import json
 import time
 from game import Game
 from flask import request
 
-app = Flask(__name__)
 load_dotenv()
+app = Flask(__name__)
 game = Game()    
 
 @app.route('/')
@@ -29,6 +29,14 @@ def interact():
 @app.route('/player/<name>')
 def player(name):
     return render_template('player.html', character_name=name)
+
+
+@app.route('/get_current_character')
+def get_character_name():
+    name = game.chapter.get_active_character_name()
+    response = make_response(name)
+    response.mimetype = 'text/plain'
+    return response
 
 
 @app.route('/observer')
