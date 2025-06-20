@@ -102,6 +102,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     // };
     eventSource.onerror = function(error) {
         console.error();
+        console.log(error);
         showNotification(`EventSource failed: ${error}`)
         eventSource.close();
         // eventSource
@@ -384,3 +385,15 @@ document.addEventListener('DOMContentLoaded', async function() {
             console.error('Error fetching initial data:', error);
         });
 });
+
+
+
+// main_player.js:123 ДЕД
+// main_player.js:39 {event: 'player_joined', data: 'ДЕД', listeners: Array(11), sender: 'server'}
+// main_player.js:39 {event: 'player_joined', data: 'Антон', listeners: Array(12), sender: 'server'}data: "Антон"event: "player_joined"listeners: (12) ['Антон', 'Антон', 'Антон', 'Антон', 'Антон', 'ДЕД', 'Антон', 'ДЕД', 'Антон', 'ДЕД', 'ДЕД', 'Антон']sender: "server"[[Prototype]]: Object
+// main_player.js:104  EventSource failed: Event {isTrusted: true, type: 'error', target: EventSource, currentTarget: EventSource, eventPhase: 2, …}
+// document.addEventListener.eventSource.onerror @ main_player.js:104
+// /stream?name=%D0%94%D0%95%D0%94:1 
+            
+            
+//             GET https://dndanger-production.up.railway.app/stream?name=%D0%94%D0%95%D0%94 net::ERR_CONNECTION_RESET 200 (OK)
