@@ -9,7 +9,7 @@ from global_defines import *
 import uuid
 MAX_MESSAGE_HISTORY_LENGTH = 100
 BUFFER_SIZE_FOR_QUEUE = 100
-KEEPALIVE_INTERVAL_SECONDS = 10
+KEEPALIVE_INTERVAL_SECONDS = 2
 
 class Game:
     """
