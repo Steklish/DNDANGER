@@ -29,7 +29,7 @@ class Game:
             context = self.context,
             characters = [
                 # self.generator.generate(Character, "Антон сын Олега, вор, который не хочет воровать,только если это очень нужно команде и/или ему. у него средний рост, тощее телосложение. Бывалый капитан пиратского корабля, который был продан за 40 гривень. Очень ловкий на корабле во время плаванья, но имеет проблемы с координацией на суше. Предпочитает лёгкую броню и оружие на цепи, взял ипотеку на новый корабль, и пока он её не выплатит не хочет умирать и впадает в ярость, увеличивающую его характеристики в двое при низком уровне здоровья (при менее 10 хп). Всего имеет 40 hp. (игрок)", self.context, "Russian"),
-                # self.generator.generate(Character, "Яша Лава - ЛАвовый голем with full hp (50 hp) random inventory (non-player character)", self.context, "Russian"),
+                self.generator.generate(Character, "Яша Лава - ЛАвовый голем with full hp (50 hp) random inventory (non-player character)", self.context, "Russian"),
                 # self.generator.generate(Character, "Яша Лужа - Водяной голем with full hp (50 hp) random inventory (non-player character)", self.context, "Russian"),
                 self.generator.generate(Character, "ДЕД - боевой дворф with full hp (50 hp) random inventory (player character)", self.context, "Russian"),
                 # self.generator.generate(Character, "Гловатейко - боевой опёздол with full hp (50 hp) random inventory (player character)", self.context, "Russian"),
@@ -43,6 +43,7 @@ class Game:
             "sender_name": "DM"
         }
         self.add_message_to_history(message)
+        self.allow_current_character_turn()
         # self.make_system_announcement(f"TST start message")
         
     def listen(self, sid : str, listener_char_name : str = "Unknown"):
@@ -161,9 +162,11 @@ class Game:
     def allow_current_character_turn(self):
         cur_character = self.chapter.get_active_character()
         if cur_character.is_alive and cur_character.is_player:
-            self.announce(EventBuilder.lock([self.chapter.get_active_character_name()]))
+            pass
         elif not cur_character.is_alive:
             self.make_system_announcement(f"Player {cur_character.name} is unable to take turns...")
+            self.chapter.move_to_next_turn()
         elif not cur_character.is_player:
             NPC_interaction = self.chapter.NPC_turn()
             self.announce_from_the_game(NPC_interaction)
+        self.announce(EventBuilder.lock([self.chapter.get_active_character_name()]))

@@ -7,7 +7,7 @@
     --bg-surface: #2d2d2d;
     --text-primary: #e0e0e0;
     --text-secondary: #999;
-    --divider: #0000009a;
+    --divider: #00000051;
     --header-height: 60px;
 
     /* text highlight colors */
@@ -435,13 +435,23 @@ select:focus {
 
 .message-text li {
     margin-left: 20px;
-    background-color: #1212123c;
+    background-color: var(--divider);
     padding: 8px;
     border-radius: 5px;
     margin-top: 10px;
     margin-bottom: 10px;
     
 }
+
+.message-text strong {
+    background-color: var(--divider);
+    color: var(--text-secondary);
+    margin: 10px;
+    display: block;
+    padding: 5px;
+    border-radius: 5px;
+}
+
 
 #message-input {
     flex: 1;
