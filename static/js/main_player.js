@@ -30,7 +30,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     let lastMessageCount = 0; // Для отслеживания новых сообщений
 
     // Создаем EventSource для получения обновлений
-    const eventSource = new EventSource(`/stream?name=${character_name}`);
+    let eventSource = new EventSource(`/stream?name=${character_name}`);
 
     // Обрабатываем получаемые сообщения
     eventSource.onmessage = function(event) {
@@ -101,16 +101,8 @@ document.addEventListener('DOMContentLoaded', async function() {
     //     }, 1000);
     // };
     eventSource.onerror = function(error) {
-        console.log(`EventSource failed`,  error);
-        // showNotification(`EventSource failed`)
         eventSource.close();
         eventSource = new EventSource(`/stream?name=${character_name}`);
-
-        // eventSource
-        // Попытка переподключения через 5 секунд
-        // setTimeout(() => {
-        //     window.location.reload();
-        // }, 5000);
     };
 
 

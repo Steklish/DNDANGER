@@ -62,6 +62,7 @@ class Game:
         self.listener_names.append(listener_char_name)
         # self.announce(EventBuilder.player_joined(listener_char_name, self.listener_names))
         try:
+            self.announce_privately(EventBuilder.lock([self.chapter.get_active_character_name()]), q)
             while True:
                 try:
                     msg = q.get(timeout=KEEPALIVE_INTERVAL_SECONDS)
