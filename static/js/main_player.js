@@ -92,13 +92,21 @@ document.addEventListener('DOMContentLoaded', async function() {
     };
 
     // Обработка ошибок подключения
+    // eventSource.onerror = function(error) {
+    //     showNotification("Connection error reconnecting")
+    //     // showNotification("The character is unavailable")
+    //     setTimeout(() => {
+    //         // window.location.href = '/login';
+    //         window.location.reload()
+    //     }, 1000);
+    // };
     eventSource.onerror = function(error) {
-        showNotification("Connection error reconnecting")
-        // showNotification("The character is unavailable")
+        console.error("EventSource failed:", error);
+        eventSource.close();
+        // Попытка переподключения через 5 секунд
         setTimeout(() => {
-            // window.location.href = '/login';
-            window.location.reload()
-        }, 1000);
+            window.location.reload();
+        }, 5000);
     };
 
 
