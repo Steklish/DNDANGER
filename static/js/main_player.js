@@ -101,12 +101,14 @@ document.addEventListener('DOMContentLoaded', async function() {
     //     }, 1000);
     // };
     eventSource.onerror = function(error) {
-        console.error("EventSource failed:", error);
+        console.error();
+        showNotification(`EventSource failed: ${error}`)
         eventSource.close();
+        // eventSource
         // Попытка переподключения через 5 секунд
-        setTimeout(() => {
-            window.location.reload();
-        }, 5000);
+        // setTimeout(() => {
+        //     window.location.reload();
+        // }, 5000);
     };
 
 
