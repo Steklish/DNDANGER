@@ -93,10 +93,11 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     // Обработка ошибок подключения
     eventSource.onerror = function(error) {
-        showNotification("Connection refused")
-        showNotification("The character is unavailable")
+        showNotification("Connection error reconnecting")
+        // showNotification("The character is unavailable")
         setTimeout(() => {
-            window.location.href = '/login';
+            // window.location.href = '/login';
+            window.location.reload()
         }, 1000);
     };
 
