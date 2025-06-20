@@ -1,17 +1,18 @@
-# Импортируем необходимые библиотеки Flask для веб-приложения
-from os import name
-from re import I
+import uuid
 from dotenv import load_dotenv
 from flask import Flask, jsonify, make_response, render_template, Response
 from models import *
-import json
-import time
 from game import Game
 from flask import request
 
 load_dotenv()
 app = Flask(__name__)
 game = Game()    
+
+@app.route('/login')
+def login():
+    return render_template('login.html', character_list=game.chapter.characters)
+
 
 @app.route('/')
 def index():
@@ -58,10 +59,11 @@ def get_info():
 @app.route('/stream')
 def stream():
     name = request.args.get('name')
+    sid = str(uuid.uuid4())
     if name:
-        return Response(game.listen(listener_char_name=name), mimetype='text/event-stream')
+        return Response(game.listen(sid, listener_char_name=name), mimetype='text/event-stream')
     else:
-        return Response(game.listen(), mimetype='text/event-stream')
+        return Response(game.listen(sid), mimetype='text/event-stream')
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=8080)

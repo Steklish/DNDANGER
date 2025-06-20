@@ -127,3 +127,19 @@ class EventBuilder:
             "listeners" : listeners,
             "sender": "server"
         }
+    
+    @staticmethod
+    def reject_connection(sid: str):
+        return {
+            "event": "connection_denied",
+            "sid": sid,
+            "sender": "server"
+        }
+        
+    @staticmethod
+    def accept_connection(sid: str):
+        return {
+            "event": "accept_connection",
+            "sid": sid,
+            "sender": "server"
+        }

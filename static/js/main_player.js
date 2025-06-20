@@ -21,7 +21,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
     // Если имя не установлено, перенаправляем на страницу логина
     if (!currentPlayerName) {
-        window.location.href = '/login.html';
+        window.location.href = '/login';
         return;
     }
 
@@ -69,6 +69,15 @@ document.addEventListener('DOMContentLoaded', async function() {
                 }
                 break;
 
+            case "connection_denied":
+                showNotification("Connection refused")
+                showNotification("The character is unavailable")
+                // секунда на почитать сообщение
+                setTimeout(() => {
+                    window.location.href = '/login';
+                }, 1000);
+                break;
+
             default:
                 // Optional: This block runs if data.event doesn't match any of the cases.
                 // It's good practice for handling unexpected events.
@@ -84,12 +93,11 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     // Обработка ошибок подключения
     eventSource.onerror = function(error) {
-        console.error("EventSource failed:", error);
-        eventSource.close();
-        // Попытка переподключения через 5 секунд
+        showNotification("Connection refused")
+        showNotification("The character is unavailable")
         setTimeout(() => {
-            window.location.reload();
-        }, 5000);
+            window.location.href = '/login';
+        }, 1000);
     };
 
 

@@ -1,13 +1,12 @@
 import json
 import queue
-from typing import Any, Generator
-
 from chapter_logic import ChapterLogicFight
 from generator import ObjectGenerator
 from models.schemas import Character
 from server_communication import *
 from server_communication.events import EventBuilder
 from global_defines import *
+import uuid
 MAX_MESSAGE_HISTORY_LENGTH = 100
 BUFFER_SIZE_FOR_QUEUE = 100
 KEEPALIVE_INTERVAL_SECONDS = 10
@@ -23,7 +22,7 @@ class Game:
         """
         self.message_history = []
         self.listeners = []
-        self.listener_names = []
+        self.listener_names = [] # character names
         self.generator = ObjectGenerator()
         self.context = "A ground beneeth the grand tree"
         self.chapter = ChapterLogicFight(
@@ -46,14 +45,18 @@ class Game:
         self.add_message_to_history(message)
         # self.make_system_announcement(f"TST start message")
         
-    def listen(self, listener_char_name : str = "Unknown"):
+    def listen(self, sid : str, listener_char_name : str = "Unknown"):
         """
         Creates a new queue for a listener, adds it to the list,
         and yields messages from it. It also sends a keep-alive signal
         periodically to prevent connection timeouts.
         """
-        print(f"{INFO_COLOR}Listener for {listener_char_name} connected. {Colors.RESET}\n Total listeners {len(self.listeners)}")
         q = queue.Queue(maxsize=BUFFER_SIZE_FOR_QUEUE)
+        print(f"{INFO_COLOR}Listener for {listener_char_name} connected. {Colors.RESET}\n Total listeners {len(self.listeners)}")
+        if listener_char_name in self.listener_names:
+            self.announce_privately(EventBuilder.reject_connection(sid), q)
+            print(f"{INFO_COLOR}Connection for {listener_char_name} {Colors.RED} refused. {Colors.RESET}\n Total listeners {len(self.listeners)}")
+            return
         self.listeners.append(q)
         self.listener_names.append(listener_char_name)
         self.announce(EventBuilder.player_joined(listener_char_name, self.listener_names))
@@ -75,7 +78,29 @@ class Game:
             self.listener_names.remove(listener_char_name)
             print(f"{INFO_COLOR}Listener for {listener_char_name} {Colors.RED} disconnected. {Colors.RESET}\n Total listeners {len(self.listeners)}")
             self.announce(EventBuilder.player_left(listener_char_name, self.listener_names))
-            
+    
+    def announce_privately(self, msg, q : queue.Queue):
+        """
+        Puts a message into an active listener queue.
+        \n
+        EventBuilder structures hanler 
+        """
+        formatted_msg = f"data: {json.dumps(msg)}\n\n"
+        try:
+                # Try to put the message into the queue without blocking.
+            q.put(formatted_msg, block=False)
+        except queue.Full:
+            # If full, remove the oldest message and put the new one.
+            try:
+                q.get(block=False)
+            except queue.Empty:
+                pass  # Should not happen, but just in case
+            try:
+                q.put(formatted_msg, block=False)
+            except queue.Full:
+                # If still full, drop the message and log
+                print(f"Listener queue still full after discarding oldest. Dropping message: {msg}")
+                
     def announce(self, msg):
         """
         Puts a message into all active listener queues.
@@ -83,22 +108,9 @@ class Game:
         EventBuilder structures hanler 
         """
         # We need to format the message for SSE
-        formatted_msg = f"data: {json.dumps(msg)}\n\n"
         for q in self.listeners:
-            try:
-                # Try to put the message into the queue without blocking.
-                q.put(formatted_msg, block=False)
-            except queue.Full:
-                # If full, remove the oldest message and put the new one.
-                try:
-                    q.get(block=False)
-                except queue.Empty:
-                    pass  # Should not happen, but just in case
-                try:
-                    q.put(formatted_msg, block=False)
-                except queue.Full:
-                    # If still full, drop the message and log
-                    print(f"Listener queue still full after discarding oldest. Dropping message: {msg}")
+            self.announce_privately(msg, q)
+            
                     
     def handle_interaction_from_player(self, interaction:str, character_name:str):
         message = {
