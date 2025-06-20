@@ -58,12 +58,16 @@ def get_info():
 
 @app.route('/stream')
 def stream():
+    headers = {
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+    }
     name = request.args.get('name')
     sid = str(uuid.uuid4())
     if name:
-        return Response(game.listen(sid, listener_char_name=name), mimetype='text/event-stream')
+        return Response(game.listen(sid, listener_char_name=name), mimetype='text/event-stream', headers=headers)
     else:
-        return Response(game.listen(sid), mimetype='text/event-stream')
+        return Response(game.listen(sid), mimetype='text/event-stream', headers=headers)
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=8080)
