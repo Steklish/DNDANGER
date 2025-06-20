@@ -54,10 +54,10 @@ class Game:
         """
         q = queue.Queue(maxsize=BUFFER_SIZE_FOR_QUEUE)
         print(f"{INFO_COLOR}Listener for {listener_char_name} connected. {Colors.RESET}\n Total listeners {len(self.listeners)}")
-        if listener_char_name in self.listener_names:
-            self.announce_privately(EventBuilder.reject_connection(sid), q)
-            print(f"{INFO_COLOR}Connection for {listener_char_name} {Colors.RED} refused. {Colors.RESET}\n Total listeners {len(self.listeners)}")
-            return
+        # if listener_char_name in self.listener_names:
+        #     self.announce_privately(EventBuilder.reject_connection(sid), q)
+        #     print(f"{INFO_COLOR}Connection for {listener_char_name} {Colors.RED} refused. {Colors.RESET}\n Total listeners {len(self.listeners)}")
+        #     return
         self.listeners.append(q)
         self.listener_names.append(listener_char_name)
         self.announce(EventBuilder.player_joined(listener_char_name, self.listener_names))
