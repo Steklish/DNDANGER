@@ -24,11 +24,11 @@ class Game:
         self.listeners = []
         self.listener_names = [] # character names
         self.generator = ObjectGenerator()
-        self.context = "A ground beneeth the grand tree"
+        self.context = "Litelly hell"
         self.chapter = ChapterLogicFight(
             context = self.context,
             characters = [
-                self.generator.generate(Character, "Антон сын другого Антона, вор, который не хочет воровать,только если это очень нужно команде и/или ему. у него средний рост, тощее телосложение. Всего имеет 40 hp. (игрок)", self.context, "Russian"),
+                self.generator.generate(Character, "Антон сын другого Антона, который тоже сын Антона, вор, который не хочет воровать,только если это очень нужно команде и/или ему. у него средний рост, тощее телосложение. Всего имеет 40 hp. (игрок)", self.context, "Russian"),
                 self.generator.generate(Character, "Яша Лава - ЛАвовый голем with full hp (50 hp) random inventory (non-player character)", self.context, "Russian"),
                 # self.generator.generate(Character, "Яша Лужа - Водяной голем with full hp (50 hp) random inventory (non-player character)", self.context, "Russian"),
                 self.generator.generate(Character, "ДЕД - боевой дворф with full hp (50 hp) random inventory (player character)", self.context, "Russian"),
@@ -54,10 +54,10 @@ class Game:
         """
         q = queue.Queue(maxsize=BUFFER_SIZE_FOR_QUEUE)
         print(f"{INFO_COLOR}Listener for {listener_char_name} connected. {Colors.RESET}\n Total listeners {len(self.listeners)}")
-        # if listener_char_name in self.listener_names:
-        #     self.announce_privately(EventBuilder.reject_connection(sid), q)
-        #     print(f"{INFO_COLOR}Connection for {listener_char_name} {Colors.RED} refused. {Colors.RESET}\n Total listeners {len(self.listeners)}")
-        #     return
+        if listener_char_name in self.listener_names:
+            self.announce_privately(EventBuilder.reject_connection(sid), q)
+            print(f"{INFO_COLOR}Connection for {listener_char_name} {Colors.RED} refused. {Colors.RESET}\n Total listeners {len(self.listeners)}")
+            return
         self.listeners.append(q)
         self.listener_names.append(listener_char_name)
         # self.announce(EventBuilder.player_joined(listener_char_name, self.listener_names))

@@ -51,13 +51,13 @@ document.addEventListener('DOMContentLoaded', async function() {
                     "system"
                 );
                 break;
-            // case "player_joined":
-            //     showNotification(`Player [${data.data}] joined the room`)
-            //     break;
+            case "player_joined":
+                showNotification(`Player [${data.data}] joined the room`)
+                break;
                 
-            // case "player_left":
-            //     showNotification(`Player [${data.data}] left the room`)
-            //     break;
+            case "player_left":
+                showNotification(`Player [${data.data}] left the room`)
+                break;
 
 
             case "lock":
@@ -96,6 +96,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     eventSource.onclose = () => console.log("SSE connection closed");
     eventSource.onerror = function(error) {
         eventSource.close();
+        showNotification("Reconnection...")
         setTimeout(() => {
             eventSource = new EventSource(`/stream?name=${character_name}`);
         }, 3000); // 3 seconds delay before reconnecting
