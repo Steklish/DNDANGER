@@ -60,7 +60,7 @@ class Game:
         #     return
         self.listeners.append(q)
         self.listener_names.append(listener_char_name)
-        self.announce(EventBuilder.player_joined(listener_char_name, self.listener_names))
+        # self.announce(EventBuilder.player_joined(listener_char_name, self.listener_names))
         try:
             while True:
                 try:
@@ -78,7 +78,7 @@ class Game:
             self.listeners.remove(q)
             self.listener_names.remove(listener_char_name)
             print(f"{INFO_COLOR}Listener for {listener_char_name} {Colors.RED} disconnected. {Colors.RESET}\n Total listeners {len(self.listeners)}")
-            self.announce(EventBuilder.player_left(listener_char_name, self.listener_names))
+            # self.announce(EventBuilder.player_left(listener_char_name, self.listener_names))
     
     def announce_privately(self, msg, q : queue.Queue):
         """

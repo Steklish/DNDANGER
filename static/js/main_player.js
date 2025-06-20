@@ -51,13 +51,13 @@ document.addEventListener('DOMContentLoaded', async function() {
                     "system"
                 );
                 break;
-            case "player_joined":
-                showNotification(`Player [${data.data}] joined the room`)
-                break;
+            // case "player_joined":
+            //     showNotification(`Player [${data.data}] joined the room`)
+            //     break;
                 
-            case "player_left":
-                showNotification(`Player [${data.data}] left the room`)
-                break;
+            // case "player_left":
+            //     showNotification(`Player [${data.data}] left the room`)
+            //     break;
 
 
             case "lock":
@@ -101,10 +101,11 @@ document.addEventListener('DOMContentLoaded', async function() {
     //     }, 1000);
     // };
     eventSource.onerror = function(error) {
-        console.error();
-        console.log(error);
-        showNotification(`EventSource failed: ${error}`)
+        console.log(`EventSource failed`,  error);
+        // showNotification(`EventSource failed`)
         eventSource.close();
+        eventSource = new EventSource(`/stream?name=${character_name}`);
+
         // eventSource
         // Попытка переподключения через 5 секунд
         // setTimeout(() => {
