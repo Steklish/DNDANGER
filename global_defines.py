@@ -56,7 +56,8 @@ TIME_COLOR = Colors.DIM + Colors.BRIGHT_WHITE
 
 
 # context length limits for a scene
-MAX_CONTEXT_LENGTH = 1100
+MAX_CONTEXT_LENGTH = 1500
+MAX_CONTEXT_LENGTH_CHARS = 6000
 
 dungeon_master_core_prompt = """
 ### Dungeon Master Core Prompt

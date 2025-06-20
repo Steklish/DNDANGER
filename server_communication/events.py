@@ -108,3 +108,22 @@ class EventBuilder:
             "data": data,
             "sender": "server"
         }
+    
+    @staticmethod
+    def player_joined(character_name: str, listeners : List[str]):
+        return {
+            "event": "player_joined",
+            "data": character_name,
+            "listeners" : listeners,
+            "sender": "server"
+        }
+        
+    
+    @staticmethod
+    def player_left(character_name: str, listeners : List[str]):
+        return {
+            "event": "player_left",
+            "data": character_name,
+            "listeners" : listeners,
+            "sender": "server"
+        }

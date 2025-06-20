@@ -1,4 +1,5 @@
 # Импортируем необходимые библиотеки Flask для веб-приложения
+from os import name
 from re import I
 from dotenv import load_dotenv
 from flask import Flask, jsonify, make_response, render_template, Response
@@ -56,7 +57,11 @@ def get_info():
 
 @app.route('/stream')
 def stream():
-    return Response(game.listen(), mimetype='text/event-stream')
+    name = request.args.get('name')
+    if name:
+        return Response(game.listen(listener_char_name=name), mimetype='text/event-stream')
+    else:
+        return Response(game.listen(), mimetype='text/event-stream')
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=8080)

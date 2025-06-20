@@ -10,7 +10,6 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300..700;1,300..700&display=swap" rel="stylesheet">
-    <!-- Заменяем локальный marked.js на CDN версию -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
@@ -131,6 +130,21 @@
         <div class="chat-input-container">
             <div class="chat-input">
                 <input type="text" id="message-input" placeholder="Type a message..." autofocus autocomplete="new_password">
+                <div id="player_wait_loading">
+                    <div class="jelly-triangle">
+                    <div class="jelly-triangle__dot"></div>
+                    <div class="jelly-triangle__traveler"></div>
+                    </div>
+                    <svg width="0" height="0" class="jelly-maker">
+                    <defs>
+                        <filter id="uib-jelly-triangle-ooze">
+                        <feGaussianBlur in="SourceGraphic" stdDeviation="7.3" result="blur"></feGaussianBlur>
+                        <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 18 -7" result="ooze"></feColorMatrix>
+                        <feBlend in="SourceGraphic" in2="ooze"></feBlend>
+                        </filter>
+                    </defs>
+                    </svg>
+                </div>
                 <button id="send-button">
                     <span class="material-icons">send</span>
                 </button>
@@ -138,6 +152,7 @@
         </div>
     </div>
     <!-- Подключение JavaScript -->
+    <script src="{{ url_for('static', filename='js/utils.js') }}"></script>
     <script src="{{ url_for('static', filename='js/main_player.js') }}"></script>
 
 </body>

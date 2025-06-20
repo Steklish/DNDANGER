@@ -7,10 +7,10 @@ from generator import ObjectGenerator
 from models.schemas import Character
 from server_communication import *
 from server_communication.events import EventBuilder
-
+from global_defines import *
 MAX_MESSAGE_HISTORY_LENGTH = 100
 BUFFER_SIZE_FOR_QUEUE = 100
-KEEPALIVE_INTERVAL_SECONDS = 20
+KEEPALIVE_INTERVAL_SECONDS = 10
 
 class Game:
     """
@@ -23,6 +23,7 @@ class Game:
         """
         self.message_history = []
         self.listeners = []
+        self.listener_names = []
         self.generator = ObjectGenerator()
         self.context = "A ground beneeth the grand tree"
         self.chapter = ChapterLogicFight(
@@ -32,7 +33,7 @@ class Game:
                 # self.generator.generate(Character, "Яша Лава - ЛАвовый голем with full hp (50 hp) random inventory (non-player character)", self.context, "Russian"),
                 # self.generator.generate(Character, "Яша Лужа - Водяной голем with full hp (50 hp) random inventory (non-player character)", self.context, "Russian"),
                 self.generator.generate(Character, "ДЕД - боевой дворф with full hp (50 hp) random inventory (player character)", self.context, "Russian"),
-                self.generator.generate(Character, "Гловатейко - боевой опёздол with full hp (50 hp) random inventory (player character)", self.context, "Russian"),
+                # self.generator.generate(Character, "Гловатейко - боевой опёздол with full hp (50 hp) random inventory (player character)", self.context, "Russian"),
                 # self.generator.generate(Character, "random monster with full hp (50 hp) and some magic spells (enemy NPC)", self.context, "Russian")
             ]
         )
@@ -43,16 +44,19 @@ class Game:
             "sender_name": "DM"
         }
         self.add_message_to_history(message)
-        self.make_system_announcement(f"TST start message")
+        # self.make_system_announcement(f"TST start message")
         
-    def listen(self):
+    def listen(self, listener_char_name : str = "Unknown"):
         """
         Creates a new queue for a listener, adds it to the list,
         and yields messages from it. It also sends a keep-alive signal
         periodically to prevent connection timeouts.
         """
+        print(f"{INFO_COLOR}Listener for {listener_char_name} connected. {Colors.RESET}\n Total listeners {len(self.listeners)}")
         q = queue.Queue(maxsize=BUFFER_SIZE_FOR_QUEUE)
         self.listeners.append(q)
+        self.listener_names.append(listener_char_name)
+        self.announce(EventBuilder.player_joined(listener_char_name, self.listener_names))
         try:
             while True:
                 try:
@@ -68,8 +72,10 @@ class Game:
         finally:
             # If the client disconnects, remove their queue from the list.
             self.listeners.remove(q)
-    
-    
+            self.listener_names.remove(listener_char_name)
+            print(f"{INFO_COLOR}Listener for {listener_char_name} {Colors.RED} disconnected. {Colors.RESET}\n Total listeners {len(self.listeners)}")
+            self.announce(EventBuilder.player_left(listener_char_name, self.listener_names))
+            
     def announce(self, msg):
         """
         Puts a message into all active listener queues.

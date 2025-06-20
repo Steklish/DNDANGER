@@ -10,7 +10,8 @@ document.addEventListener('DOMContentLoaded', async function() {
     const menuClose = document.getElementById('menuClose');
     const menuItems = document.querySelectorAll('.menu-item');
     const character_name = document.getElementById('character_name').innerHTML;
-
+    const playerWaitLoading = document.getElementById('player_wait_loading');
+    playerWaitLoading.style.display = "none"
     // Получаем имя игрока из localStorage (установленное при логине)
     const currentPlayerName = localStorage.getItem('playerName');
     
@@ -29,34 +30,52 @@ document.addEventListener('DOMContentLoaded', async function() {
     let lastMessageCount = 0; // Для отслеживания новых сообщений
 
     // Создаем EventSource для получения обновлений
-    const eventSource = new EventSource("/stream");
+    const eventSource = new EventSource(`/stream?name=${character_name}`);
 
     // Обрабатываем получаемые сообщения
     eventSource.onmessage = function(event) {
         try {
             const data = JSON.parse(event.data);
             console.log(data)
-            if (data.event == "message"){
+            switch (data.event) {
+            case "message":
                 addMessage(
-                    data.data, 
+                    data.data,
                     data.sender
-                )
-            }
-            if (data.event == "alert"){
-                addMessage(
-                    data.data, 
-                    "system"
-                )
-            }
-            if (data.event == "lock"){
-                if (data.allowed_players.includes(character_name)){
-                    unlock_input()
-                }
-                else {
-                    lock_input(data.allowed_players.length != 0)
-                }
-            }
+                );
+                break; // Prevents "fall-through" to the next case
 
+            case "alert":
+                addMessage(
+                    data.data,
+                    "system"
+                );
+                break;
+            case "player_joined":
+                showNotification(`Player [${data.data}] joined the room`)
+                break;
+                
+            case "player_left":
+                showNotification(`Player [${data.data}] left the room`)
+                break;
+
+
+            case "lock":
+                if (data.allowed_players.includes(character_name)) {
+                    unlock_input();
+                } else {
+                    // Using strict inequality (!==) is generally safer than loose (!=)
+                    lock_input(data.allowed_players.length !== 0);
+                }
+                break;
+
+            default:
+                // Optional: This block runs if data.event doesn't match any of the cases.
+                // It's good practice for handling unexpected events.
+                console.log(`Received an unhandled event type: ${data.event}`);
+                break;
+        }
+            
             // updateUI(data);
         } catch (error) {
             console.error('Error processing update:', error);
@@ -75,6 +94,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 
 
     function unlock_input(){
+        playerWaitLoading.style.display = "none";
         messageInput.disabled = false
         sendButton.disabled = false
         messageInput.placeholder="Type a message..."
@@ -88,6 +108,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
 
     async function lock_input(is_waiting = true) {
+        playerWaitLoading.style.display = "";
         messageInput.disabled = true
         sendButton.disabled = true
         messageInput.placeholder = is_waiting 

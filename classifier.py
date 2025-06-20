@@ -32,7 +32,7 @@ class Classifier:
         try:
             print(f"{INFO_COLOR}🤖 Generating content with model:{Colors.RESET} {ENTITY_COLOR}{self.model}{Colors.RESET}")
             response = self.client.models.generate_content(
-                model=self.model,
+                model=self.model, # type: ignore
                 contents=contents,
                 config={
                     "response_mime_type": response_mime_type,
@@ -47,7 +47,7 @@ class Classifier:
         try:
             print(f"{INFO_COLOR}🤖 Generating content with model:{Colors.RESET} {ENTITY_COLOR}{self.model}{Colors.RESET}")
             response = self.client.models.generate_content(
-                model=self.model,
+                model=self.model, # type: ignore
                 contents=contents,
                 config={
                     "response_mime_type": response_mime_type,
@@ -90,7 +90,7 @@ class Classifier:
             print(f"{INFO_COLOR}🤖 Making text request to model: {ENTITY_COLOR}{self.model}{Colors.RESET}")
             # The full_prompt is now used in the API call
             response = self.client.models.generate_content(
-                model=self.model,
+                model=self.model, # type: ignore
                 contents=full_prompt,
                 config={
 					"response_mime_type": response_mime_type,

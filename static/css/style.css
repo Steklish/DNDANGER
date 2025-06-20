@@ -1,24 +1,31 @@
 :root {
     --primary: #b3c963;
-    --primary-dark: #3e403b;
+    --primary-dark: #383838;
     --sent-message-bg:#8daa60;
     --bg-dark: #121212;
     --bg-card: #1e1e1e;
     --bg-surface: #2d2d2d;
     --text-primary: #e0e0e0;
     --text-secondary: #999;
-    --divider: #333;
+    --divider: #0000009a;
+    --header-height: 60px;
+
+    /* text highlight colors */
     --keyword: #d3a67a;
     --name: #adcd84;
     --condition: #a9a8e5;
-    --header-height: 60px;
+
     --rarity-common: #b4b4b4;
-    --rarity-uncommon: #1eff00;
-    --rarity-rare: #0070dd;
-    --rarity-very-rare: #a335ee;
-    --rarity-legendary: #ff8000;
+    --rarity-uncommon: #5ee17f;
+    --rarity-rare: #4985c1;
+    --rarity-very-rare: #984ccb;
+    --rarity-legendary: #db8835;
     --rarity-artifact: #e6cc80;
-    --rarity-unique: #ff0000;
+    --rarity-unique: #8d2525;
+
+    --damage: #d6533c;
+    --heal: #aae062;
+    
 }
 @import url(
     'https://fonts.googleapis.com/css?family=Roboto&display=swap'
@@ -41,6 +48,14 @@
 }
 .condition{
     color: var(--condition);
+}
+
+.damage {
+    color: var(--damage);
+}
+
+.heal {
+    color: var(--heal);
 }
 
 
@@ -481,6 +496,7 @@ select:focus {
     background-color: var(--bg-surface); /* Use a dull, non-interactive color */
     color: var(--text-secondary);        /* Mute the icon color */
     cursor: not-allowed;                 /* Show a "not allowed" cursor */
+    display: none;
 }
 
 /* Optional: Explicitly remove the hover effect when disabled */
@@ -854,3 +870,148 @@ select:focus {
         .inventory-item .item-header .name.rarity-Legendary { text-shadow: 0 0 2px var(--rarity-legendary); }
         .inventory-item .item-header .name.rarity-Artifact { text-shadow: 0 0 2px var(--rarity-artifact); }
         .inventory-item .item-header .name.rarity-Unique { text-shadow: 0 0 2px var(--rarity-unique); }
+
+    /* --- NEW: CONTAINER FOR NOTIFICATIONS --- */
+#notification-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    width: 320px;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    gap: 10px; /* Space between notifications */
+}
+
+
+/* --- STYLES FOR THE INDIVIDUAL NOTIFICATION --- */
+.info {
+    width: 100%; /* Will take width of container */
+    padding: 12px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: start;
+    background: var(--primary-dark);
+    border-radius: 8px;
+    box-shadow: 0px 4px 15px -3px rgba(0, 0, 0, 0.2);
+    color: #fff;
+    
+    /* --- ANIMATION STYLES --- */
+    
+    /* 1. Initial State (Hidden, above its final position) */
+    opacity: 0;
+    transform: translateY(-30px);
+    
+    /* 2. Smooth transition for slide and fade */
+    transition: transform 0.4s ease-out, opacity 0.4s ease-out;
+}
+
+/* 3. A "show" class to trigger the slide-in animation */
+.info.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.info__icon {
+    width: 20px;
+    height: 20px;
+    transform: translateY(-2px);
+    margin-right: 8px;
+    flex-shrink: 0;
+}
+
+.info__icon path { fill: #fff; }
+
+.info__title {
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+/* From Uiverse.io by G4b413l */ 
+.jelly-triangle {
+    margin-right: 10px;
+ --uib-size: 42px;
+ --uib-speed: 1.25s;
+ --uib-color: var(--primary-dark);
+ position: relative;
+ height: var(--uib-size);
+ width: var(--uib-size);
+ filter: url('#uib-jelly-triangle-ooze');
+}
+
+.jelly-triangle__dot,
+.jelly-triangle::before,
+.jelly-triangle::after {
+ content: '';
+ position: absolute;
+ width: 33%;
+ height: 33%;
+ background: var(--uib-color);
+ border-radius: 100%;
+}
+
+.jelly-triangle__dot {
+ top: 6%;
+ left: 30%;
+ animation: grow0 var(--uib-speed) ease infinite;
+}
+
+.jelly-triangle::before {
+ bottom: 6%;
+ right: 0;
+ animation: grow0 var(--uib-speed) ease calc(var(--uib-speed) * -0.666)
+    infinite;
+}
+
+.jelly-triangle::after {
+ bottom: 6%;
+ left: 0;
+ animation: grow0 var(--uib-speed) ease calc(var(--uib-speed) * -0.333)
+    infinite;
+}
+
+.jelly-triangle__traveler {
+ position: absolute;
+ top: 6%;
+ left: 30%;
+ width: 33%;
+ height: 33%;
+ background: var(--uib-color);
+ border-radius: 100%;
+ animation: triangulate var(--uib-speed) ease infinite;
+}
+
+.jelly-maker {
+ width: 0;
+ height: 0;
+ position: absolute;
+}
+
+@keyframes triangulate {
+ 0%,
+  100% {
+  transform: none;
+ }
+
+ 33.333% {
+  transform: translate(120%, 175%);
+ }
+
+ 66.666% {
+  transform: translate(-95%, 175%);
+ }
+}
+
+@keyframes grow0 {
+ 0%,
+  100% {
+  transform: scale(1.5);
+ }
+
+ 20%,
+  70% {
+  transform: none;
+ }
+}

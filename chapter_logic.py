@@ -6,15 +6,7 @@ from generator import ObjectGenerator
 from models import *
 from server_communication.events import EventBuilder
 from utils import *
-from global_defines import (
-    Colors, 
-    ERROR_COLOR, 
-    HEADER_COLOR,
-    ENTITY_COLOR,
-    SUCCESS_COLOR,
-    INFO_COLOR,
-    MAX_CONTEXT_LENGTH
-)
+from global_defines import *
 import global_defines
 from models import *
 
@@ -120,14 +112,13 @@ class ChapterLogicFight:
         self.context = self.classifier.general_text_llm_request(
         f"""
             Provide the details that matter for the next scene. 
-            Try to extract Dungeon Master's intent on the current scene and the context.
             Store which characters are allied with which ones and what can change this alliance. Store their motivations and goals.
-            If some info is missing you are allowed to create it. 
             Dont ask additional information.
-            in no context provided at all come up with something like "evry memory have faded away and the past seems very blury". 
-            Dont generate additional text, only story extract for the current scene.
-            Current context:
-            {self.context}
+            Imagine where all the players should be located in the scene. Dont analyze characters at all.
+            Give more attention to the script and story and less to the scene and characters details.
+            IMPORTANT: Keep your response maximum {MAX_CONTEXT_LENGTH} words.
+            ---
+            {self.get_actual_context()}
         """
         )
         
@@ -191,7 +182,7 @@ class ChapterLogicFight:
         *   **Пример:** Если персонаж без меча пытается "ударить мечом", правильный ответ: `is_legal: false`, `narrative_description: "Вы хватаетесь за пояс, чтобы вытащить меч, но нащупываете лишь пустое место. Вы вспоминаете, что оставили его в своей комнате."`
 
     **ЭТАП 2: СИМУЛЯЦИЯ ИСХОДА (ЕСЛИ ДЕЙСТВИЕ ВОЗМОЖНО)**
-    1.  **Используй логику D&D:** Если действие возможно (`is_legal: true`), симулируй его исход, как будто ты бросаешь игровые кости.
+    1.  **Используй логику D&D:** Если действие возможно (`is_legal: true`), симулируй его исход, как будто ты бросаешь игровые кости (игроку показывай кубики и значения результата броска используй <code>3 ( кубик 1d4)</code> для обозначения бросков и их результатов).
         *   **Атака:** Учитывай оружие атакующего, его характеристики (сила/ловкость) и Класс Доспеха (КД) цели. Мощный удар секирой должен наносить больше урона, чем укол кинжалом.
         *   **Заклинания и Эффекты:** Если действие накладывает эффект (например, <span class="condition">ослепление</span>, <span class="condition">огонь</span>), опиши это и отрази в `structural_changes`.
         *   **Проверки Характеристик:** Для действий вроде "попытаться убедить стражника" или "взломать замок", оцени сложность и шансы на успех.
@@ -206,8 +197,11 @@ class ChapterLogicFight:
         -   `<span class="damage">описание урона</span>` для любого вреда.
         -   `<span class="heal">описание исцеления</span>` для восстановления здоровья.
         -   `<span class="condition">описание состояния</span>` для наложения эффектов.
-    -   `structural_changes`: Список объектов, описывающих конкретные изменения. Если изменений нет, оставь пустым `[]`.
+    -   `structural_changes`: Список объектов, описывающих конкретные изменения. Также используй теги. Обязательно указывай числа и результаты бросков, а не сами броски. Если изменений нет, оставь пустым `[]`.
     -   `is_legal`: `true` или `false`.
+    Important: if for example a character took their sword and left it in the middle of the road it should be a change for the charactera and a cahnge for the scene as well.
+    Example: if a character lightens up a bonfire you shoud come up with something like "LIght up a bonfire" - where object type is scene.
+    Example: if a character uses a potion it should be removed from their inventory.
     </OUTPUT_FORMAT>
 
     <CONTEXT>
@@ -242,11 +236,13 @@ class ChapterLogicFight:
         changes = outcome.structural_changes
 
         # The rest of the logic
-        self.context += f"\n\n{character.name} performs action (DM's response): {narrative}" # type: ignore
+        self.context += f"\n\n{character.name} tries to perform action {action_text}\n" # type: ignore
         yield EventBuilder.DM_message(narrative) # type: ignore
 
         if outcome.is_legal:
             for i, change in enumerate(changes, 1):
+                self.context += f"<Action outcomes>"
+                self.context += f"\n{i}. {change.object_name} -> ({change.changes})"
                 if change.object_type == "character":
                     self.update_character(change.object_name, change.changes)
                 elif change.object_type == "scene":
@@ -260,38 +256,11 @@ class ChapterLogicFight:
                 yield EventBuilder.alert(f"{change.object_name}: {change.changes}")
             print(f"{SUCCESS_COLOR}All changes applied successfully{Colors.RESET}")    
             self.move_to_next_turn()
+            self.context += f"</Action outcomes>"
         else:
-            yield EventBuilder.alert("Not a legal action from a player...")
+            self.context += f"\nNothinig happens...\n"
+            yield EventBuilder.alert("Impossible to act...")
     
-    def apply_changes_after_turn(self, action_description : str, character : Character):
-        """
-        Applies changes after action was preformed.
-        """
-        changes : list[ChangesToMake] = self.classifier.generate_list(
-            contents=f"""
-            Action by character: {character.name}
-            
-            Outcome description:
-            {action_description}
-            
-            
-            Important: if for example a character took their sword and left it in the middle of the road it should be a change for the charactera and a cahnge for the scene as well.
-            Example: if a character lightens up a bonfire you shoud come up with something like "LIght up a bonfire" - where object type is scene.
-            """,
-            pydantic_model=ChangesToMake
-        ) # type: ignore
-
-        for change in changes: # type: ignore
-            # Apply each change to the character/scene
-            if change.object_type == "character":
-                self.update_character(
-                    character_name=change.object_name,
-                    changes_to_make=change.changes
-                    )
-            elif change.object_type == "scene":
-                self.update_scene(change.object_name, change.changes) # type: ignore
-        print("ALl the changes applied successfully")
-        
     def askedDM(self, character: Character, question: str):
         """
         Handles a character asking the DM a question.
@@ -310,13 +279,14 @@ class ChapterLogicFight:
         "{question}"
         """
         reply = self.classifier.general_text_llm_request(prompt)
-        self.context =  str(self.context) + f"\n\nPlayer that controlls {character.name} asks: {question}"
-        self.context += f"\n\nDM's response: {reply}"
-        print(f"{SUCCESS_COLOR}🎲 DM's response:{Colors.RESET} {reply}")
+        self.context =  str(self.context) + f"<Chracter's interaction>{character.name} asks DM: {question}</Chracter's interaction>"
+        self.context += f"<DM's response>\n{reply}</DM's response>\n"
         yield EventBuilder.DM_message(reply) # type: ignore
         # return reply
 
     def trim_context(self):
+        print(f"\n{DEBUG_COLOR}Context trimming...{Colors.RED} {len(self.context)} chars of context {Colors.RESET}") # type: ignore
+        print(f"{Colors.RED}context before{self.context}")
         self.context = self.classifier.general_text_llm_request(
             f"""
 <ROLE>
@@ -324,7 +294,7 @@ class ChapterLogicFight:
 </ROLE>
 
 <FULL_CONTEXT>
-{self.context}
+{self.get_actual_context()}
 </FULL_CONTEXT>
 
 <TASK>
@@ -339,6 +309,7 @@ class ChapterLogicFight:
 </TASK>
 """
         )
+        print(f"{Colors.GREEN}context after{self.context} {Colors.RESET}")
         
 
     def process_interaction(self, character: Character, interaction: str):
@@ -354,9 +325,6 @@ class ChapterLogicFight:
             """, 
             pydantic_model=ClassifyInformationOrActionRequest
         )  # type: ignore
-        interaction += "\n\n"
-        interaction += decision.reasoning # type: ignore
-        result = None
         if decision.decision: # type: ignore
             yield EventBuilder.user_intent_processed("info")
             print(f"{INFO_COLOR}Request for info {Colors.RESET}")
@@ -365,6 +333,7 @@ class ChapterLogicFight:
             yield EventBuilder.user_intent_processed("action")
             print(f"{INFO_COLOR}Request for action {Colors.RESET}")
             yield from self.action(character, interaction)
+        self.after_turn()
     
     def get_character_by_name(self, name:str) -> Character:
         for char in self.characters:
@@ -376,18 +345,11 @@ class ChapterLogicFight:
         """
         Actions to perform after each player's turn.
         """
-        print(f"\n{INFO_COLOR}📝 Processing after-turn effects...{Colors.RESET}")
-        updated_context = self.classifier.general_text_llm_request(
-            f"""Update the context based on the latest actions and events in the fight. Remove unimportant detailes and restore important story details 
-            Current context:
-            {self.context} 
-            Context from the last scene:
-            {self.last_scene}
-            """
-        )
-        if updated_context: 
-            self.context = updated_context
-            print(f"{SUCCESS_COLOR}✨ Context updated{Colors.RESET}")
+        print(f"\n{INFO_COLOR}📝 Processing after-turn effects...{Colors.YELLOW} {len(self.context)} chars of context {Colors.RESET}") # type: ignore
+        if len(self.context) > MAX_CONTEXT_LENGTH_CHARS:  # type: ignore
+            self.trim_context()
+            if self.context: 
+                print(f"{SUCCESS_COLOR}✨ Context updated{Colors.RESET}")
 
     def NPC_turn(self):
         """

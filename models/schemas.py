@@ -67,6 +67,13 @@ class Character(BaseModel):
     clothing_and_cosmetics: str = Field(description="Описание одежды, украшений, макияжа и других косметических деталей персонажа.")
     gender: str = Field(description="Пол персонажа. (Возможные пояснения, если пол не является стандартным или не существует для данного существа)")
     
+    # --- Базовые характеристики D&D ---
+    strength: int = Field(description="Сила (Strength). Измеряет физическую мощь, атлетизм.")
+    dexterity: int = Field(description="Ловкость (Dexterity). Измеряет проворство, рефлексы и равновесие.")
+    constitution: int = Field(description="Телосложение (Constitution). Измеряет выносливость, стойкость и жизненную силу.")
+    intelligence: int = Field(description="Интеллект (Intelligence). Измеряет остроту ума и способность к логическому мышлению.")
+    wisdom: int = Field(description="Мудрость (Wisdom). Отражает здравомыслие, интуицию и гармонию с окружающим миром.")
+    charisma: int = Field(description="Харизма (Charisma). Измеряет силу личности, умение убеждать и личное обаяние.")
 class SceneObject(BaseModel):
     """
     Pydantic schema for a general object within a scene, like a door, tree, or statue.
