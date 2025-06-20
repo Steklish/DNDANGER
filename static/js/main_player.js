@@ -92,19 +92,15 @@ document.addEventListener('DOMContentLoaded', async function() {
     };
 
     // Обработка ошибок подключения
-    // eventSource.onerror = function(error) {
-    //     showNotification("Connection error reconnecting")
-    //     // showNotification("The character is unavailable")
-    //     setTimeout(() => {
-    //         // window.location.href = '/login';
-    //         window.location.reload()
-    //     }, 1000);
-    // };
+    eventSource.onopen = () => console.log("SSE connection opened");
+    eventSource.onclose = () => console.log("SSE connection closed");
     eventSource.onerror = function(error) {
         eventSource.close();
-        eventSource = new EventSource(`/stream?name=${character_name}`);
+        setTimeout(() => {
+            eventSource = new EventSource(`/stream?name=${character_name}`);
+        }, 3000); // 3 seconds delay before reconnecting
     };
-
+// АНТОН ХУЙ
 
     function unlock_input(){
         playerWaitLoading.style.display = "none";
