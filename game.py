@@ -2,14 +2,14 @@ import json
 import queue
 from chapter_logic import ChapterLogicFight
 from generator import ObjectGenerator
+from models.reuqest_types import GameMode
 from models.schemas import Character
 from server_communication import *
 from server_communication.events import EventBuilder
 from global_defines import *
-import uuid
 MAX_MESSAGE_HISTORY_LENGTH = 100
 BUFFER_SIZE_FOR_QUEUE = 100
-KEEPALIVE_INTERVAL_SECONDS = 2
+KEEPALIVE_INTERVAL_SECONDS = 5
 
 class Game:
     """
@@ -28,11 +28,11 @@ class Game:
         self.chapter = ChapterLogicFight(
             context = self.context,
             characters = [
-                self.generator.generate(Character, "Антон сын другого Антона, который тоже сын Антона, вор, который не хочет воровать,только если это очень нужно команде и/или ему. у него средний рост, тощее телосложение. Всего имеет 40 hp. (игрок)", self.context, "Russian"),
-                self.generator.generate(Character, "Яша Лава - ЛАвовый голем with full hp (50 hp) random inventory (non-player character)", self.context, "Russian"),
+                # self.generator.generate(Character, "Антон сын другого Антона, который тоже сын Антона, вор, который не хочет воровать,только если это очень нужно команде и/или ему. у него средний рост, тощее телосложение. Всего имеет 40 hp. (игрок)", self.context, "Russian"),
+                # self.generator.generate(Character, "Яша Лава - ЛАвовый голем with full hp (10 hp) random inventory (non-player character)", self.context, "Russian"),
                 # self.generator.generate(Character, "Яша Лужа - Водяной голем with full hp (50 hp) random inventory (non-player character)", self.context, "Russian"),
-                self.generator.generate(Character, "ДЕД - боевой дворф with full hp (50 hp) random inventory (player character)", self.context, "Russian"),
-                # self.generator.generate(Character, "Аполониус - боевой опёздол with full hp (50 hp) random inventory (player character)", self.context, "Russian"),
+                self.generator.generate(Character, "Игрок 1 - боевой дворф with full hp (50 hp) random inventory (player character)", self.context, "Russian"),
+                self.generator.generate(Character, "Игрок 1 - маг с кучей заклинаний with full hp (50 hp) random inventory (player character)", self.context, "Russian"),
                 # self.generator.generate(Character, "random monster with full hp (50 hp) and some magic spells (enemy NPC)", self.context, "Russian")
             ]
         )
@@ -54,10 +54,10 @@ class Game:
         """
         q = queue.Queue(maxsize=BUFFER_SIZE_FOR_QUEUE)
         print(f"{INFO_COLOR}Listener for {listener_char_name} connected. {Colors.RESET}\n Total listeners {len(self.listeners)}")
-        if listener_char_name in self.listener_names:
-            self.announce_privately(EventBuilder.reject_connection(sid), q)
-            print(f"{INFO_COLOR}Connection for {listener_char_name} {Colors.RED} refused. {Colors.RESET}\n Total listeners {len(self.listeners)}")
-            return
+        # if listener_char_name in self.listener_names:
+        #     self.announce_privately(EventBuilder.reject_connection(sid), q)
+        #     print(f"{INFO_COLOR}Connection for {listener_char_name} {Colors.RED} refused. {Colors.RESET}\n Total listeners {len(self.listeners)}")
+        #     return
         self.listeners.append(q)
         self.listener_names.append(listener_char_name)
         self.announce(EventBuilder.player_joined(listener_char_name, self.listener_names))
@@ -141,7 +141,7 @@ class Game:
         for event  in generator:
             print("Event recieved from the game:")
             print(event)
-            if event["event"] == "message" and event["sender"] == "DM":
+            if event["event"] == "message" and (event["sender"] == "DM"):
                 message = {
                     "message_text": event["data"],
                     "sender_name": event["sender"]
@@ -161,13 +161,23 @@ class Game:
             self.message_history.pop(0)
             
     def allow_current_character_turn(self):
-        cur_character = self.chapter.get_active_character()
-        if cur_character.is_alive and cur_character.is_player:
-            pass
-        elif not cur_character.is_alive:
-            self.make_system_announcement(f"Player {cur_character.name} is unable to take turns...")
-            self.chapter.move_to_next_turn()
-        elif not cur_character.is_player:
-            NPC_interaction = self.chapter.NPC_turn()
-            self.announce_from_the_game(NPC_interaction)
-        self.announce(EventBuilder.lock([self.chapter.get_active_character_name()]))
+        print("allowing some turn...")
+        if self.chapter.game_mode == GameMode.COMBAT:
+            cur_character = self.chapter.get_active_character()
+            if cur_character.is_alive and cur_character.is_player:
+                print("Allowing player turn")
+                pass
+            elif not cur_character.is_alive:
+                self.make_system_announcement(f"Player {cur_character.name} is unable to take turns...")
+                self.chapter.move_to_next_turn()
+            elif not cur_character.is_player:
+                print("Allowing NPC turn")
+                NPC_interaction = self.chapter.NPC_turn()
+                self.announce_from_the_game(NPC_interaction)
+            self.announce(EventBuilder.lock([self.chapter.get_active_character_name()]))
+        else:
+            allowed_players = []
+            for char in self.chapter.characters:
+                if char.is_alive:
+                    allowed_players.append(char.name)
+            self.announce(EventBuilder.lock(allowed_players, GameMode.NARRATIVE))

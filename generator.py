@@ -123,43 +123,51 @@ if __name__ == "__main__":
         print(f"\n{HEADER_COLOR}{'=' * 20}{Colors.RESET}")
         print(f"{HEADER_COLOR}[1] Generating a random character in Russian...{Colors.RESET}")
         start_time = time.time()
-        random_russian_character = generator.generate(Character, language="Russian")
+        
+        random_russian_character = generator.generate(
+            pydantic_model=Character,
+            prompt="Создай персонажа - мага с 4 заклинаниями", 
+            context="Персонаж должен быть из мира фэнтези",
+            language="Russian"
+        )
+        
+        
         generation_time = time.time() - start_time
         generation_times.append(("Random Russian Character", generation_time))
         print(f"\n{SUCCESS_COLOR}✅ Generated Random Russian Character{Colors.RESET} ({TIME_COLOR}took {generation_time:.2f} seconds{Colors.RESET}):")
         print(random_russian_character.model_dump_json(indent=2))
 
-        # --- Example 2: Generate a SPECIFIC item in RUSSIAN ---
-        print(f"\n{HEADER_COLOR}{'=' * 20}{Colors.RESET}")
-        print(f"{HEADER_COLOR}[2] Generating a specific item in Russian...{Colors.RESET}")
-        start_time = time.time()
-        item_prompt_ru = "Волшебный меч, который светится синим в присутствии орков"
-        item_context_ru = "Выкован гномами в древней, забытой кузнице"
-        russian_sword = generator.generate(Item, prompt=item_prompt_ru, context=item_context_ru, language="Russian")
-        generation_time = time.time() - start_time
-        generation_times.append(("Specific Russian Item", generation_time))
-        print(f"\n{SUCCESS_COLOR}✅ Generated Specific Russian Item{Colors.RESET} ({TIME_COLOR}took {generation_time:.2f} seconds{Colors.RESET}):")
-        print(russian_sword.model_dump_json(indent=2))
+        # # --- Example 2: Generate a SPECIFIC item in RUSSIAN ---
+        # print(f"\n{HEADER_COLOR}{'=' * 20}{Colors.RESET}")
+        # print(f"{HEADER_COLOR}[2] Generating a specific item in Russian...{Colors.RESET}")
+        # start_time = time.time()
+        # item_prompt_ru = "Волшебный меч, который светится синим в присутствии орков"
+        # item_context_ru = "Выкован гномами в древней, забытой кузнице"
+        # russian_sword = generator.generate(Item, prompt=item_prompt_ru, context=item_context_ru, language="Russian")
+        # generation_time = time.time() - start_time
+        # generation_times.append(("Specific Russian Item", generation_time))
+        # print(f"\n{SUCCESS_COLOR}✅ Generated Specific Russian Item{Colors.RESET} ({TIME_COLOR}took {generation_time:.2f} seconds{Colors.RESET}):")
+        # print(russian_sword.model_dump_json(indent=2))
         
-        # --- Example 3: Generate a random scene ---
-        print(f"\n{HEADER_COLOR}{'=' * 20}{Colors.RESET}")
-        print(f"{HEADER_COLOR}[3] Generating a random scene...{Colors.RESET}")
-        start_time = time.time()
-        random_scene = generator.generate(Scene, language="Russian")
-        generation_time = time.time() - start_time
-        generation_times.append(("Random Scene in Russian", generation_time))
-        print(f"\n{SUCCESS_COLOR}✅ Generated Random Scene in Russian{Colors.RESET} ({TIME_COLOR}took {generation_time:.2f} seconds{Colors.RESET}):")
-        print(random_scene.model_dump_json(indent=2))
+        # # --- Example 3: Generate a random scene ---
+        # print(f"\n{HEADER_COLOR}{'=' * 20}{Colors.RESET}")
+        # print(f"{HEADER_COLOR}[3] Generating a random scene...{Colors.RESET}")
+        # start_time = time.time()
+        # random_scene = generator.generate(Scene, language="Russian")
+        # generation_time = time.time() - start_time
+        # generation_times.append(("Random Scene in Russian", generation_time))
+        # print(f"\n{SUCCESS_COLOR}✅ Generated Random Scene in Russian{Colors.RESET} ({TIME_COLOR}took {generation_time:.2f} seconds{Colors.RESET}):")
+        # print(random_scene.model_dump_json(indent=2))
 
-        # Print performance summary
-        total_time = time.time() - total_start_time
-        print(f"\n{HEADER_COLOR}{'=' * 20}{Colors.RESET}")
-        print(f"{HEADER_COLOR}🕒 Performance Summary:{Colors.RESET}")
-        print(f"{Colors.DIM}{'─' * 20}{Colors.RESET}")
-        for name, duration in generation_times:
-            print(f"{INFO_COLOR}▸ {name}:{Colors.RESET} {TIME_COLOR}{duration:.2f} seconds{Colors.RESET}")
-        print(f"{HEADER_COLOR}Total execution time:{Colors.RESET} {TIME_COLOR}{total_time:.2f} seconds{Colors.RESET}")
-        print(f"{HEADER_COLOR}{'=' * 20}{Colors.RESET}")
+        # # Print performance summary
+        # total_time = time.time() - total_start_time
+        # print(f"\n{HEADER_COLOR}{'=' * 20}{Colors.RESET}")
+        # print(f"{HEADER_COLOR}🕒 Performance Summary:{Colors.RESET}")
+        # print(f"{Colors.DIM}{'─' * 20}{Colors.RESET}")
+        # for name, duration in generation_times:
+        #     print(f"{INFO_COLOR}▸ {name}:{Colors.RESET} {TIME_COLOR}{duration:.2f} seconds{Colors.RESET}")
+        # print(f"{HEADER_COLOR}Total execution time:{Colors.RESET} {TIME_COLOR}{total_time:.2f} seconds{Colors.RESET}")
+        # print(f"{HEADER_COLOR}{'=' * 20}{Colors.RESET}")
 
     except ValueError as e:
         print(f"\n{ERROR_COLOR}❌ An error occurred during generation:{Colors.RESET} {e}")

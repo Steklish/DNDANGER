@@ -1,5 +1,7 @@
 from typing import List
 
+from models.reuqest_types import GameMode
+
 
 class EventBuilder:
 
@@ -16,7 +18,7 @@ class EventBuilder:
 
 
     @staticmethod
-    def lock(allowed_players: List[str]):
+    def lock(allowed_players: List[str], game_mode : GameMode = GameMode.COMBAT):
         """Создает событие блокировки/разблокировки для контроля очередности ходов игроков.
 
         Args:
@@ -27,7 +29,8 @@ class EventBuilder:
         """
         return {
             "event": "lock",
-            "allowed_players": allowed_players
+            "allowed_players": allowed_players,
+            "game_mode" : game_mode
         }
         
     @staticmethod

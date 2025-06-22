@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 from classifier import Classifier
 from generator import ObjectGenerator
 from models import *
+from prompter import Prompter
 from server_communication.events import EventBuilder
 from utils import *
 from global_defines import *
@@ -26,6 +27,8 @@ class ChapterLogicFight:
         self.language = language
         self.turn_order = [char.name for char in self.characters]
         self.current_turn = 0
+        self.game_mode = GameMode.NARRATIVE
+        self.prompter = Prompter()
     
     def update_scene(self, scene_name: str, changes_to_make: str):
         """
@@ -149,6 +152,7 @@ Your response must be ONLY the complete, updated JSON object for the character. 
         """
         Initializes the fight by generating objects and their actions based on the context.
         """
+        self.game_mode = GameMode.NARRATIVE
         print(f"\n{HEADER_COLOR}🎲 Generating Scene...{Colors.RESET}")
         
         # scene context is the same one as the chapter context (context at creating the chapter)
@@ -216,89 +220,11 @@ Your response must be ONLY the complete, updated JSON object for the character. 
     """
         # print(data)
         return data
-       
-    def get_action_prompt(self, character: Character, action_text: str, is_NPC = False) -> str:
-        """
-        Generates a prompt for the LLM to act as a Dungeon Master,
-        evaluating a character's action with a strong emphasis on rules and legality.
-        """
-        return f"""
-<ROLE>
-{global_defines.dungeon_master_core_prompt}
-</ROLE>
 
-<RULES>
-Твоя работа делится на два этапа: сначала проверка возможности действия, затем — симуляция его исхода.
 
-**ЭТАП 1: ПРОВЕРКА ВОЗМОЖНОСТИ ДЕЙСТВИЯ (ЗАКОННОСТЬ)**
-1.  **Это твой первый и главный шаг.** Прежде чем что-либо симулировать, определи, может ли персонаж вообще совершить это действие (`is_legal`).
-2.  **Проверь следующие условия:**
-    *   **Предметы:** Есть ли у персонажа необходимый предмет? (Например, есть ли у него меч для атаки мечом? Есть ли зелье, чтобы его выпить?)
-    *   **Состояние:** Позволяет ли состояние персонажа совершить действие? (Например, он не может читать заклинание, если на него наложен эффект <span class="condition">безмолвие</span>).
-    *   **Окружение:** Позволяет ли окружение совершить действие? (Например, нельзя выстрелить из лука, если он вплотную прижат к стене).
-3.  **Если действие НЕВОЗМОЖНО (`is_legal` будет `false`):**
-    *   Твой `narrative_description` ДОЛЖЕН вежливо и ясно объяснить игроку, почему его действие невозможно.
-    *   Поле `structural_changes` ДОЛЖНО быть пустым (`[]`).
-    *   **Пример:** Если персонаж без меча пытается "ударить мечом", правильный ответ: `is_legal: false`, `narrative_description: "Вы хватаетесь за пояс, чтобы вытащить меч, но нащупываете лишь пустое место. Вы вспоминаете, что оставили его в своей комнате."`
 
-**ЭТАП 2: СИМУЛЯЦИЯ ИСХОДА (ЕСЛИ ДЕЙСТВИЕ ВОЗМОЖНО)**
-Если действие возможно (`is_legal: true`), ты симулируешь его исход по строгим правилам, имитирующим D&D. Ты не используешь генератор случайных чисел, а **выбираешь** результат, основываясь на логике.
 
-**Процесс симуляции:**
 
-1.  **Определи и объяви Проверку.** Для действий с неопределенным исходом (убеждение, взлом, атака) ты должен назначить **Сложность (СЛ)** или использовать **Класс Доспеха (КД)** цели. Сообщи это значение в `narrative_description`.
-    *   **Сложность (СЛ):** 5 (очень легко), 10 (просто), 15 (средне), 20 (сложно), 25 (очень сложно).
-    *   **Класс Доспеха (КД):** Используй КД цели из контекста.
-
-2.  **Симулируй "бросок" d20.** Ты **выбираешь** число от 1 до 20, основываясь на анализе ситуации (подготовка, окружение, шансы на успех).
-    *   **Критический провал (выбери 1):** Только для абсурдных или обреченных на провал действий. Автоматический провал с негативными последствиями.
-    *   **Неблагоприятная ситуация (выбери 2-8):** Действие выполняется в плохих условиях (под дождем, в темноте, под давлением).
-    *   **Нейтральная ситуация (выбери 9-12):** Нет явных преимуществ или помех.
-    *   **Благоприятная ситуация (выбери 13-18):** У персонажа есть преимущество (хороший план, внезапность, подходящие инструменты).
-    *   **Критический успех (выбери 19-20):** Для гениальных идей или идеальных условий. Автоматический успех с дополнительным бонусом.
-
-3.  **Покажи полный расчет и вынеси вердикт.** В `narrative_description` четко и прозрачно покажи игроку весь расчет.
-    *   **Формат для проверки навыка:** `Проверка [Навыка]: [Результат d20] + [Модификатор] = [Итог] против СЛ [Значение СЛ] -> Успех/Провал.`
-    *   **Формат для атаки:** `Бросок атаки: [Результат d20] + [Модификатор] = [Итог] против КД [Значение КД] -> Попадание/Промах.`
-
-4.  **Симуляция других "бросков" (урон, эффекты).** Используй тот же принцип. Для урона 2d6 (диапазон 2-12), выбери результат в зависимости от успеха атаки: слабый удар (2-4), средний (5-8), мощный/критический (9-12). Всегда показывай расчет.
-    *   **Формат для урона:** `Урон: <span class="damage">[результат броска] ([формула кубиков])</span>`
-
-5.  **Опиши результат.** После всех расчетов дай яркое и логичное описание последствий.
-
-**Пример симуляции для действия "попытаться убедить стражника пропустить меня":**
-*   **`narrative_description`:** "Вы подходите к стражнику, который скрестил руки на груди и смотрит на вас с подозрением. Убедить его будет непросто. **Сложность (СЛ): 15**.
-    *   *Проверка Убеждения: 11 (бросок) + 3 (харизма) = **14** против СЛ **15** -> **Провал.**
-    *   Ваши слова звучат уверенно, но стражник лишь качает головой. 'Приказы есть приказы. Прохода нет.'"*
-
-**Философия:** Будь беспристрастен. Исход должен быть логичным следствием действия, характеристик персонажа и состояния мира. Каждое механическое последствие (урон, исцеление, потраченный предмет, изменение статуса) ДОЛЖНО быть отражено как отдельный объект в списке `structural_changes`.
-</RULES>
-
-<OUTPUT_FORMAT>
-Твой ответ ДОЛЖЕН быть ОДНИМ JSON-объектом, БЕЗ каких-либо дополнительных пояснений или текста до/после него. JSON должен строго соответствовать Pydantic-модели `ActionOutcome`.
--   `narrative_description`: Красочное описание для игрока. **ОБЯЗАТЕЛЬНО** используй эти HTML-теги:
-    -   `<span class="name">Имя</span>` для имен и названий.
-    -   `<span class="damage">описание урона</span>` для любого вреда.
-    -   `<span class="heal">описание исцеления</span>` для восстановления здоровья.
-    -   `<span class="condition">описание состояния</span>` для наложения эффектов.
--   `structural_changes`: Список объектов, описывающих конкретные изменения. Также используй теги. Обязательно указывай числа и результаты бросков, а не сами броски. Если изменений нет, оставь пустым `[]`.
--   `is_legal`: `true` или `false`.
-Important: if for example a character took their sword and left it in the middle of the road it should be a change for the charactera and a cahnge for the scene as well.
-Example: if a character lightens up a bonfire you shoud come up with something like "LIght up a bonfire" - where object type is scene.
-Example: if a character uses a potion it should be removed from their inventory.
-</OUTPUT_FORMAT>
-
-<CONTEXT>
-{self.get_actual_context()}
-</CONTEXT>
-
-<TASK>
-Персонаж <span class="name">{character.name}</span> совершает следующее действие: "{action_text}"
-{"IMPORTANT: the current character is an NPC so you should make corresponding narrative" if is_NPC else ""}
-Сгенерируй JSON-объект `ActionOutcome`, описывающий результат.
-</TASK>
-"""
-    # Inside ChapterLogicFight class
 
     def action(self, character: Character, action_text: str, is_NPC = False):
         """
@@ -311,7 +237,7 @@ Example: if a character uses a potion it should be removed from their inventory.
         # это вообще не та функция, которую я сюда планировал
         outcome: ActionOutcome = self.generator.generate(
             pydantic_model=ActionOutcome,
-            prompt=self.get_action_prompt(character, action_text, is_NPC),
+            prompt=self.prompter.get_action_prompt(self, character, action_text, is_NPC),
             language=self.language
         )
 
@@ -322,6 +248,8 @@ Example: if a character uses a potion it should be removed from their inventory.
         self.context += f"\n\n{character.name} tries to perform action {action_text}\n" # type: ignore
         yield EventBuilder.DM_message(narrative) # type: ignore
 
+        if is_NPC: outcome.is_legal = True
+        
         if outcome.is_legal:
             for i, change in enumerate(changes, 1):
                 self.context += f"<Action outcomes>"
@@ -340,10 +268,11 @@ Example: if a character uses a potion it should be removed from their inventory.
             print(f"{SUCCESS_COLOR}All changes applied successfully{Colors.RESET}")    
             self.move_to_next_turn()
             self.context += f"</Action outcomes>"
+            yield from self.after_action(outcome)
         else:
             self.context += f"\nNothinig happens...\n"
             yield EventBuilder.alert("Impossible to act...")
-    
+        
     def askedDM(self, character: Character, question: str):
         """
         Handles a character asking the DM a question.
@@ -462,15 +391,45 @@ Provide your response as a single JSON object matching the `ClassifyInformationO
                 return char
         return self.characters[0]
     
+    def after_action(self, outcome:ActionOutcome):
+        print("after action processing")
+        analisys : TurnAnalysisOutcome = self.generator.generate(
+            pydantic_model=TurnAnalysisOutcome,
+            prompt=self.prompter.get_turn_analysis_prompt(self, self.game_mode),
+            language="Russian"
+        )
+        print(analisys)
+        
+        if self.game_mode != analisys.recommended_mode:
+            self.game_mode = analisys.recommended_mode
+            yield EventBuilder.alert(f'Game mode changed to <span class="keyword">{self.game_mode.name}</span>')
+        
+    
     def after_turn(self):
-        """
-        Actions to perform after each player's turn.
-        """
         print(f"\n{INFO_COLOR}📝 Processing after-turn effects...{Colors.YELLOW} {len(self.context)} chars of context {Colors.RESET}") # type: ignore
         if len(self.context) > MAX_CONTEXT_LENGTH_CHARS:  # type: ignore
             self.trim_context()
             if self.context: 
                 print(f"{SUCCESS_COLOR}✨ Context updated{Colors.RESET}")
+        if self.game_mode == GameMode.NARRATIVE:
+            self.after_narrative()
+        
+    def after_narrative(self):
+        analisys : NarrativeTurnAnalysis = self.generator.generate(
+            pydantic_model=NarrativeTurnAnalysis,
+            prompt=self.prompter.get_narrative_analysis_prompt(self),
+            language="Russian"
+        )
+        for change in analisys.proactive_world_changes:
+            if change.change_type == ProactiveChangeType.ADD_OBJECT or \
+                change.change_type == ProactiveChangeType.REMOVE_OBJECT or \
+                    change.change_type == ProactiveChangeType.UPDATE_OBJECT:
+                        if change.payload.object_type == "character": # type: ignore
+                            self.update_character(change.payload.object_name, change.payload.changes) # type: ignore
+                        elif change.object_type == "scene": # type: ignore
+                            self.update_scene(change.payload.object_name, change.payload.changes) # type: ignore
+                            
+        print(analisys)
 
     def NPC_turn(self):
         """
@@ -507,7 +466,7 @@ Provide your response as a single JSON object matching the `ClassifyInformationO
 """
         NPC_action = self.classifier.general_text_llm_request(NPC_action_prompt)
         yield from self.action(self.get_active_character(), NPC_action) # type: ignore
-        
+        self.after_turn()
         
 if __name__ == "__main__":
     load_dotenv()

@@ -51,18 +51,21 @@ document.addEventListener('DOMContentLoaded', async function() {
                     "system"
                 );
                 break;
-            case "player_joined":
-                showNotification(`Player [${data.data}] joined the room`)
-                break;
+            // case "player_joined":
+            //     showNotification(`Player [${data.data}] joined the room`)
+            //     break;
                 
-            case "player_left":
-                showNotification(`Player [${data.data}] left the room`)
-                break;
+            // case "player_left":
+            //     showNotification(`Player [${data.data}] left the room`)
+            //     break;
 
 
             case "lock":
                 if (data.allowed_players.includes(character_name)) {
                     unlock_input();
+                    if (data.game_mode == "NARRATIVE"){
+                        messageInput.placeholder = "Type something (story mode)..."
+                    }
                 } else {
                     // Using strict inequality (!==) is generally safer than loose (!=)
                     lock_input(data.allowed_players.length !== 0);
@@ -100,8 +103,8 @@ document.addEventListener('DOMContentLoaded', async function() {
         setTimeout(() => {
             eventSource = new EventSource(`/stream?name=${character_name}`);
         }, 3000); // 3 seconds delay before reconnecting
+        refresh()
     };
-// АНТОН ХУЙ
 
     function unlock_input(){
         playerWaitLoading.style.display = "none";
@@ -365,15 +368,20 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
     });
 
+    function refresh(){
+        fetch('/refresh')
+            .then(response => response.json())
+            .then(data => {
+                updateUI(data);
+            })
+            .catch(error => {
+                console.error('Error fetching initial data:', error);
+            });
+
+    }
+
+    refresh()
     // Выполняем первоначальную загрузку данных
-    fetch('/refresh')
-        .then(response => response.json())
-        .then(data => {
-            updateUI(data);
-        })
-        .catch(error => {
-            console.error('Error fetching initial data:', error);
-        });
 });
 
 

@@ -48,14 +48,26 @@
 }
 .condition{
     color: var(--condition);
+    background-color: color-mix(in srgb, var(--condition) 10%, transparent);
+    padding-left: 4px;
+    padding-right: 4px;
+    border-radius: 5px;
 }
 
 .damage {
-    color: var(--damage);
+  color: var(--damage);
+  background-color: color-mix(in srgb, var(--damage) 10%, transparent);
+  padding-left: 4px;
+  padding-right: 4px;
+  border-radius: 5px;
 }
 
 .heal {
     color: var(--heal);
+    background-color: color-mix(in srgb, var(--heal) 10%, transparent);
+    padding-left: 4px;
+    padding-right: 4px;
+    border-radius: 5px;
 }
 
 
