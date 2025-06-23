@@ -1,14 +1,22 @@
+
 # DND Born in Pain
 
-A sophisticated AI-powered Dungeon Master assistant for D&D campaigns, leveraging Python, Flask, and Google's Gemini AI to create immersive storytelling experiences.
+Интеллектуальный AI-ассистент Dungeon Master для D&D кампаний, использующий Python, FastAPI и Google Gemini AI для создания захватывающих повествований.
+
+## Цели проекта
+- Перейти на современный асинхронный веб-фреймворк FastAPI для большей производительности и масштабируемости.
+- Обеспечить удобный REST API и поддержку Server-Sent Events (SSE) для стриминга игровых событий.
+- Интегрировать Google Gemini AI для генерации описаний, сцен и обработки игровых событий.
+- Предоставить современный веб-интерфейс для игроков, наблюдателей и ведущего.
+- Поддерживать гибкую архитектуру для расширения игровых механик и интеграции новых AI-моделей.
+
 
 ## Установка
 1. Настройте переменные окружения:
-```bash
-# Скопируйте пример файла окружения
-cp .env.example .env
-```
-
+   ```bash
+   # Скопируйте пример файла окружения
+   cp .env.example .env
+   ```
 2. Настройте учетные данные Google AI:
    - Получите API-ключ Google в Google Cloud Console
    - Добавьте ваш API-ключ в файл .env:
@@ -19,12 +27,20 @@ cp .env.example .env
 
 ## Использование
 
+
 ### Запуск приложения:
 ```bash
-python app.py
+uvicorn main:app --reload --host 0.0.0.0 --port 8080
 ```
 
+
 ## Технические детали
+- Бэкенд: FastAPI (асинхронный Python-фреймворк)
+- SSE для стриминга игровых событий
+- Google Gemini AI для генерации контента
+- Pydantic для валидации данных
+- Jinja2 для шаблонов HTML
+- Современная структура фронтенда (JS/CSS вынесены отдельно)
 
 ## Участие в разработке
 
@@ -35,135 +51,99 @@ python app.py
 5. Откройте Pull Request
 
 
+
 ### EVENTS
 
 - keepalive
-   ```
+   ```json
    {
-      data : any
+      "data": any
    }
    ```
 - lock/unlock message
-      
-   ```
+   ```json
    {
-      event : lock 
-      allowed_players : [  // имя игрока который сейчас ходит.
-         player_name_1
-         player_name_2
-      ]   
+      "event": "lock",
+      "allowed_players": ["player_name_1", "player_name_2"]
    }
    ```
 - other player's message
-   ```
+   ```json
    {
-      event : other_player_message 
-      data : text
-      sender : character_name
+      "event": "other_player_message",
+      "data": "text",
+      "sender": "character_name"
    }
    ```
 - state_update_required
-   ```
+   ```json
    {
-      event : some_stat_update
-      total: n
-      current: c
+      "event": "some_stat_update",
+      "total": n,
+      "current": c
    }
-   ```  
+   ```
+
 
 ### REQUESTS
 
 - full update - `GET`
-   - `/refresh - выдавать всю инфу про главу`
+   - `/refresh` — получить всю информацию о главе
       - (см. описание классов в ./models/schemas.py)
-         ```
+         ```json
          {
-            scene : sceneOBJ,
-            characters : [
-               playerObj_1,
-               playerObj_1
-            ],
-            schat_history : [
-               {
-                  message_text : "asdsad",
-                  sender_name : "yyy"
-               },
-               {
-                  message_text : "fhcghj,bbbhb",
-                  sender_name : "xxx"
-               }
+            "scene": sceneOBJ,
+            "characters": [playerObj_1, playerObj_2],
+            "chat_history": [
+               {"message_text": "asdsad", "sender_name": "yyy"},
+               {"message_text": "fhcghj,bbbhb", "sender_name": "xxx"}
             ]
          }
          ```
+- interaction — `POST /interact`
 
-- interaction
-   `/interaction - POST`
 
-# пример работы со стримом `JS`
+# Пример работы со стримом (SSE)
+
+## JS
 ```js
-// 1. Create a new EventSource object to connect to our /stream endpoint
 const eventSource = new EventSource("/stream");
-
-// 2. Listen for the 'message' event from the server
 eventSource.onmessage = function(event) {
    const data = JSON.parse(event.data);
    console.log(data);
 };
 ```
-# пример работы со стримом `Python`
+
+## Python
 ```python
 data_dict = {
-	'value': random.randint(1, 100),
-	'user': random.choice(['Alice', 'Bob', 'Charlie']),
-	'timestamp': time.strftime('%H:%M:%S'),
-	'isValid': random.choice([True, False])
+    'value': random.randint(1, 100),
+    'user': random.choice(['Alice', 'Bob', 'Charlie']),
+    'timestamp': time.strftime('%H:%M:%S'),
+    'isValid': random.choice([True, False])
 }
-# 2. Convert the dictionary to a JSON string
 json_data = json.dumps(data_dict)
-
-# 3. Format it as an SSE message
-#    The 'data:' prefix is required, followed by the JSON string.
-#    The two newlines ('\n\n') signal the end of the event.
 sse_message = f"data: {json_data}\n\n"
-
-# 4. Yield the message to the client
 yield sse_message
 ```
+
 
 
 # ВАЖНО
 
 ### Web-часть
 
-- `login.html`
-   - тут выюор персонажа (возможно, создание)
-   - тут же выбор того, зайдешь ли как игрок или как доска админа
-- `player.html`
-   - тут мменюшка игрока
-      - чат с событиями
-      - боковая панель со статами / инвентарем / описаниями
-- `observer.html`
-   - тут общая менюшка
-      - кто сейчас ходит (включая врагов)
-      - статы для всех дейстыующих лиц
-      - состояние сцены (м б какая-то визуализация)
+- `login.html` — выбор персонажа (или создание), выбор режима (игрок/админ)
+- `player.html` — меню игрока: чат, боковая панель со статами, инвентарём, описаниями
+- `observer.html` — общая панель: кто ходит, статы всех, состояние сцены
 
-# Что нужно доделать на 19.06
-
-- ~~сделать общий `стильный файл`~~
-- ~~сделать `js` файлы отдельно от шаблонов для `html`~~
-- ~~в админке карточки не работают правильно (только первая нормальная а дальше пизда)~~
-- разобраться с работой стрима
-   - ~~сделать `/stream` эндпоинт~~
-   - ~~почитай сверху в ридми примеры работы со стримом~~
-- почистить админку и передвинуть карточки
-- ~~почистить говнокод в `fetchUpdate()`~~
-   - сделать адекватное создание объектов после `refresh`
-
-- сделать логику отправки сигналов о блокировке ходов (сервер)
-- обработать все варианты сигналов (из events.py)
-   - сделать блокировку / разблокировку
-   - придумать, что делать с событиями оюновления (которые  n иp m)
-   - если нужна какая-то доп дата - напиши мне
-- пофиксить списки в маркдауне
-- пункт `Details: {"damage":"1d8","damage_type":"Рубящий","range":"Ближний бой"}` в аблках на админке
+# TODO (на 19.06 и далее)
+- Доработать стриминг событий через FastAPI SSE
+- Почистить админку и передвинуть карточки
+- Сделать логику отправки сигналов о блокировке ходов (сервер)
+- Обработать все варианты сигналов (из events.py)
+  - Сделать блокировку / разблокировку
+  - Придумать, что делать с событиями обновления (n и p m)
+  - Если нужна доп. дата — напиши мне
+- Пофиксить списки в маркдауне
+- Исправить отображение деталей в админке

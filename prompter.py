@@ -58,12 +58,8 @@ class Prompter:
 </TASK>
 """
 
-    
     def get_action_prompt(self, chapter: 'ChapterLogicFight', character: Character, action_text: str, is_NPC: bool = False) -> str:
-        """
-        Generates a prompt for the LLM to act as a Dungeon Master,
-        evaluating a character's action with a strong emphasis on rules and legality.
-        """
+
         return f"""
 <ROLE>
 {global_defines.dungeon_master_core_prompt}
@@ -144,7 +140,6 @@ Example: if a character uses a potion it should be removed from their inventory.
 Сгенерируй JSON-объект `ActionOutcome`, описывающий результат.
 </TASK>
 """
-
     
     def get_turn_analysis_prompt(self, chapter: 'ChapterLogicFight', current_mode: GameMode) -> str:
         """

@@ -1,4 +1,5 @@
 import json
+from math import e
 import random
 from dotenv import load_dotenv
 from classifier import Classifier
@@ -145,7 +146,7 @@ Your response must be ONLY the complete, updated JSON object for the character. 
             # Optionally re-add the original character on any failure
             if 'character' in locals() and character not in self.characters: # type: ignore
                 self.characters.append(character) # type: ignore
-            return
+            yield EventBuilder.error(f"Error updating character {character_name}: {e}")
         
 
     def setup_fight(self):
@@ -393,13 +394,15 @@ Provide your response as a single JSON object matching the `ClassifyInformationO
     
     def after_action(self, outcome:ActionOutcome):
         print("after action processing")
+        prompt = self.prompter.get_turn_analysis_prompt(self, self.game_mode)
         analisys : TurnAnalysisOutcome = self.generator.generate(
             pydantic_model=TurnAnalysisOutcome,
-            prompt=self.prompter.get_turn_analysis_prompt(self, self.game_mode),
+            prompt=prompt,
             language="Russian"
         )
+        print(f"\n{HEADER_COLOR}📝 Analyzing turn outcome...{Colors.RESET}")
+        # print(f"{DEBUG_COLOR}Raw prompt: {prompt}{Colors.RESET}")
         print(analisys)
-        
         if self.game_mode != analisys.recommended_mode:
             self.game_mode = analisys.recommended_mode
             yield EventBuilder.alert(f'Game mode changed to <span class="keyword">{self.game_mode.name}</span>')
@@ -417,19 +420,22 @@ Provide your response as a single JSON object matching the `ClassifyInformationO
     def after_narrative(self):
         analisys : NarrativeTurnAnalysis = self.generator.generate(
             pydantic_model=NarrativeTurnAnalysis,
-            prompt=self.prompter.get_narrative_analysis_prompt(self),
-            language="Russian"
+            prompt=self.prompter.get_narrative_analysis_prompt(self)
         )
-        for change in analisys.proactive_world_changes:
-            if change.change_type == ProactiveChangeType.ADD_OBJECT or \
-                change.change_type == ProactiveChangeType.REMOVE_OBJECT or \
-                    change.change_type == ProactiveChangeType.UPDATE_OBJECT:
-                        if change.payload.object_type == "character": # type: ignore
-                            self.update_character(change.payload.object_name, change.payload.changes) # type: ignore
-                        elif change.object_type == "scene": # type: ignore
-                            self.update_scene(change.payload.object_name, change.payload.changes) # type: ignore
-                            
-        print(analisys)
+        print(f"\n{HEADER_COLOR}📝 Analyzing narrative turn outcome...{Colors.RESET}")
+        print(f"{DEBUG_COLOR}Raw analysis: {analisys}{Colors.RESET}")
+        try:
+            for change in analisys.proactive_world_changes:
+                if change.change_type == ProactiveChangeType.ADD_OBJECT or \
+                    change.change_type == ProactiveChangeType.REMOVE_OBJECT or \
+                        change.change_type == ProactiveChangeType.UPDATE_OBJECT:
+                            if change.payload.object_type == "character": # type: ignore
+                                self.update_character(change.payload.object_name, change.payload.changes) # type: ignore
+                            elif change.object_type == "scene": # type: ignore
+                                self.update_scene(change.payload.object_name, change.payload.changes) # type: ignore
+        except Exception as e:
+            yield EventBuilder.error(f"Error occurred during narrative turn analysis: {e}")
+            print(f"{ERROR_COLOR}Error occurred during narrative turn analysis: {e}{Colors.RESET}")
 
     def NPC_turn(self):
         """

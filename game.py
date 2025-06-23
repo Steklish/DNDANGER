@@ -1,5 +1,6 @@
 import json
 import queue
+from traceback import print_tb
 from chapter_logic import ChapterLogicFight
 from generator import ObjectGenerator
 from models.reuqest_types import GameMode
@@ -29,10 +30,10 @@ class Game:
             context = self.context,
             characters = [
                 # self.generator.generate(Character, "Антон сын другого Антона, который тоже сын Антона, вор, который не хочет воровать,только если это очень нужно команде и/или ему. у него средний рост, тощее телосложение. Всего имеет 40 hp. (игрок)", self.context, "Russian"),
-                # self.generator.generate(Character, "Яша Лава - ЛАвовый голем with full hp (10 hp) random inventory (non-player character)", self.context, "Russian"),
+                self.generator.generate(Character, "Яша Лава - ЛАвовый голем with full hp (10 hp) random inventory (non-player character)", self.context, "Russian"),
                 # self.generator.generate(Character, "Яша Лужа - Водяной голем with full hp (50 hp) random inventory (non-player character)", self.context, "Russian"),
-                self.generator.generate(Character, "Игрок 1 - боевой дворф with full hp (50 hp) random inventory (player character)", self.context, "Russian"),
-                self.generator.generate(Character, "Игрок 1 - маг с кучей заклинаний with full hp (50 hp) random inventory (player character)", self.context, "Russian"),
+                # self.generator.generate(Character, "Игрок 1 - боевой дворф with full hp (50 hp) random inventory (player character)", self.context, "Russian"),
+                self.generator.generate(Character, "Игрок 2 - маг с кучей заклинаний with full hp (50 hp) random inventory (player character)", self.context, "Russian"),
                 # self.generator.generate(Character, "random monster with full hp (50 hp) and some magic spells (enemy NPC)", self.context, "Russian")
             ]
         )
@@ -120,7 +121,6 @@ class Game:
             "sender_name": character_name
         }
         self.add_message_to_history(message)
-        # sending an event of message being recevied by server
         self.announce(EventBuilder.player_message(interaction, character_name))
         
         self.announce(EventBuilder.lock_all())
@@ -162,22 +162,25 @@ class Game:
             
     def allow_current_character_turn(self):
         print("allowing some turn...")
+        print(f"Current game mode: {self.chapter.game_mode}, current character: {self.chapter.get_active_character_name()}")
         if self.chapter.game_mode == GameMode.COMBAT:
-            cur_character = self.chapter.get_active_character()
-            if cur_character.is_alive and cur_character.is_player:
-                print("Allowing player turn")
-                pass
-            elif not cur_character.is_alive:
-                self.make_system_announcement(f"Player {cur_character.name} is unable to take turns...")
-                self.chapter.move_to_next_turn()
-            elif not cur_character.is_player:
-                print("Allowing NPC turn")
-                NPC_interaction = self.chapter.NPC_turn()
-                self.announce_from_the_game(NPC_interaction)
+            # Loop until a living player is found or all NPCs/Dead are skipped
+            while True:
+                cur_character = self.chapter.get_active_character()
+                if cur_character.is_alive and cur_character.is_player:
+                    print("Allowing player turn")
+                    break  # Player's turn, exit loop
+                elif not cur_character.is_alive:
+                    self.make_system_announcement(f"Player {cur_character.name} is unable to take turns...")
+                    self.chapter.move_to_next_turn()
+                    # Continue loop to check next character
+                elif not cur_character.is_player:
+                    print("Allowing NPC turn")
+                    NPC_interaction = self.chapter.NPC_turn()
+                    self.announce_from_the_game(NPC_interaction)
+                    self.chapter.move_to_next_turn()
+                    # Continue loop to check next character
             self.announce(EventBuilder.lock([self.chapter.get_active_character_name()]))
         else:
-            allowed_players = []
-            for char in self.chapter.characters:
-                if char.is_alive:
-                    allowed_players.append(char.name)
+            allowed_players = [char.name for char in self.chapter.characters if char.is_alive]
             self.announce(EventBuilder.lock(allowed_players, GameMode.NARRATIVE))

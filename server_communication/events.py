@@ -146,3 +146,11 @@ class EventBuilder:
             "sid": sid,
             "sender": "server"
         }
+        
+    @staticmethod
+    def error(error_message: str):
+        return {
+            "event": "error",
+            "error_message": error_message,
+            "sender": "server"
+        }
