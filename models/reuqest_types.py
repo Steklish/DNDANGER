@@ -166,3 +166,12 @@ class NarrativeTurnAnalysis(BaseModel):
                 ]
             }
         }
+        
+class TurnList(BaseModel):
+    turn_list: List[str] = Field(
+        description="List of the names of characters participating in the scene. In logical order (in order they should act in a turn based game) based on provided context"
+    )
+    reasoning: str = Field(
+        description="A brief explanation of the order of characters in the turn list. Should be based on the context provided."
+    )
+    

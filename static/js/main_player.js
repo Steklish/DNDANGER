@@ -147,7 +147,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
 
     function addMessage(messageText, senderName) {
-        const scrollThreshold = 30; 
+        const scrollThreshold = 60; 
         const isScrolledToBottom = chatMessages.scrollHeight - chatMessages.clientHeight <= chatMessages.scrollTop + scrollThreshold;
         if (senderName == "system"){
             let new_message = `

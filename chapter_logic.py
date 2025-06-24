@@ -1,7 +1,9 @@
 import json
 from math import e
 import random
+from tkinter import E
 from dotenv import load_dotenv
+from rsa import verify
 from classifier import Classifier
 from generator import ObjectGenerator
 from models import *
@@ -30,8 +32,22 @@ class ChapterLogicFight:
         self.current_turn = 0
         self.game_mode = GameMode.NARRATIVE
         self.prompter = Prompter()
+        self.generate_scene()
     
-    def update_scene(self, scene_name: str, changes_to_make: str):
+    def shuffle_turns(self):
+        new_turns : TurnList = self.classifier.generate(
+            contents=str(self.context) + f"<cahracter list>{json.dumps(self.turn_order)}</cahracter list> You need to provide all those names in the order that is logical to currect scene. Example: Elly attacs the Goblin -> Elly have wasted her tur attacking so the next turn is likely to be goblins tern and only after the Goblin other characters should be placed in turn order, where Elly is likely to be in the endo of the list of turns. All the characters should be placed in a new turn list. No matter if they cant take rutns or dont participate for any reason",
+            pydantic_model=TurnList,
+        ) # type: ignore
+        print(f"Raw turn shuffle result:{DEBUG_COLOR} {new_turns.turn_list}{Colors.RESET}")
+        print(f"Reasoning : {new_turns.reasoning}") # type: ignore
+        verify_turns = []
+        for char in new_turns.turn_list:
+            verify_turns.append(find_closest_match(char, self.turn_order))
+        self.turn_order = verify_turns
+        
+    
+    async def update_scene(self, scene_name: str, changes_to_make: str):
         """
         Updates the current scene with the provided changes.
         
@@ -59,7 +75,7 @@ class ChapterLogicFight:
 # from your_colors_file import ENTITY_COLOR, INFO_COLOR, SUCCESS_COLOR, ERROR_COLOR, Colors
 # from your_utils_file import find_closest_match
 
-    def update_character(self, character_name: str, changes_to_make: str):
+    async def update_character(self, character_name: str, changes_to_make: str):
         """
         Updates a character's attributes based on the provided changes using a robust, rule-based LLM prompt.
         
@@ -72,17 +88,10 @@ class ChapterLogicFight:
             char_dict = {char.name: char for char in self.characters}
             
             target_char_name = find_closest_match(character_name, char_name_list)
-            if not target_char_name:
-                print(f"{ERROR_COLOR}❌ Error: Character '{character_name}' not found.{Colors.RESET}")
-                return
-                
             character = char_dict[target_char_name]
-
             # Convert the current character object to a JSON string for clean input to the LLM
             character_json = character.model_dump_json(indent=2)
 
-            # --- ENHANCED PROMPT ---
-            # This new prompt is highly structured and provides explicit rules to the LLM.
             prompt = f"""
 <ROLE>
 You are a meticulous D&D Game State Engine. Your task is to receive the current JSON data of a character and a description of changes, then output a new, updated JSON object for that character. You must follow the game rules precisely and only output the final JSON.
@@ -117,9 +126,7 @@ Update the following character's data based on the described changes.
 Your response must be ONLY the complete, updated JSON object for the character. Do not include any explanations, markdown formatting, or any other text outside of the final JSON structure.
 </OUTPUT_INSTRUCTIONS>
     """
-            # --- END OF ENHANCED PROMPT ---
-
-            # The old character object is removed before generating the new one
+            
             if character:
                 self.characters.remove(character) 
             
@@ -128,12 +135,6 @@ Your response must be ONLY the complete, updated JSON object for the character. 
                 prompt=prompt,
                 language=self.language
             )
-
-            if not updated_character:
-                # If the LLM fails, re-add the original character to avoid data loss
-                self.characters.append(character)
-                raise ValueError("LLM failed to return a valid updated character object.")
-
             self.characters.append(updated_character)
             print(f"{SUCCESS_COLOR}✨ Character '{updated_character.name}' updated successfully!{Colors.RESET}")
             
@@ -146,16 +147,8 @@ Your response must be ONLY the complete, updated JSON object for the character. 
             # Optionally re-add the original character on any failure
             if 'character' in locals() and character not in self.characters: # type: ignore
                 self.characters.append(character) # type: ignore
-            yield EventBuilder.error(f"Error updating character {character_name}: {e}")
-        
-
-    def setup_fight(self):
-        """
-        Initializes the fight by generating objects and their actions based on the context.
-        """
-        self.game_mode = GameMode.NARRATIVE
-        print(f"\n{HEADER_COLOR}🎲 Generating Scene...{Colors.RESET}")
-        
+            
+    def generate_scene(self):
         # scene context is the same one as the chapter context (context at creating the chapter)
         scene_d = self.classifier.generate(
             f"Generate a scene description and difficulty based on the context: {self.context}",
@@ -170,9 +163,18 @@ Your response must be ONLY the complete, updated JSON object for the character. 
         )
 
         print(f"\n{SUCCESS_COLOR}✨ Generated Scene:{Colors.RESET} {ENTITY_COLOR}{self.scene.name}{Colors.RESET}")
+        print(f"{INFO_COLOR} DIfficulty: {scene_d.scene_difficulty}{Colors.RESET}") # type: ignore
         print(f"{INFO_COLOR}📜 Description:{Colors.RESET} {self.scene.description}")
 
 
+    def setup_fight(self):
+        """
+        Initializes the fight by generating objects and their actions based on the context.
+        """
+        self.game_mode = GameMode.COMBAT
+        print(f"\n{HEADER_COLOR}🎲 Generating Scene...{Colors.RESET}")
+        
+        
         # Here i remove unnecessary parts from the context to reduce memory usage
         self.context = self.classifier.general_text_llm_request(
         f"""
@@ -188,7 +190,8 @@ Your response must be ONLY the complete, updated JSON object for the character. 
         )
         
         self.turn_order = [char.name for char in self.characters]
-        random.shuffle(self.turn_order)
+        # random.shuffle(self.turn_order)
+        self.shuffle_turns()
         print(f"{INFO_COLOR}Turn order shuffled{Colors.RESET}")
         
         
@@ -256,9 +259,9 @@ Your response must be ONLY the complete, updated JSON object for the character. 
                 self.context += f"<Action outcomes>"
                 self.context += f"\n{i}. {change.object_name} -> ({change.changes})"
                 if change.object_type == "character":
-                    self.update_character(change.object_name, change.changes)
+                    await self.update_character(change.object_name, change.changes)
                 elif change.object_type == "scene":
-                    self.update_scene(change.object_name, change.changes)
+                    await self.update_scene(change.object_name, change.changes)
                     
                 yield EventBuilder.state_update_required(
                     update=f"{change.object_name} был обновлен ({change.changes})",
@@ -412,6 +415,7 @@ Provide your response as a single JSON object matching the `ClassifyInformationO
         if self.game_mode == GameMode.NARRATIVE:
             async for event in self.after_narrative(): # type: ignore
                 yield event
+        yield EventBuilder.end_of_turn()
     
     async def after_turn(self):
         print(f"\n{INFO_COLOR}📝 Processing after-turn effects...{Colors.YELLOW} {len(self.context)} chars of context {Colors.RESET}") # type: ignore
@@ -423,7 +427,7 @@ Provide your response as a single JSON object matching the `ClassifyInformationO
             async for event in self.after_narrative(): # type: ignore
                 yield event
 
-    def after_narrative(self):
+    async def after_narrative(self):
         analisys : NarrativeTurnAnalysis = self.generator.generate(
             pydantic_model=NarrativeTurnAnalysis,
             prompt=self.prompter.get_narrative_analysis_prompt(self)
@@ -437,7 +441,7 @@ Provide your response as a single JSON object matching the `ClassifyInformationO
                         change.change_type == ProactiveChangeType.UPDATE_OBJECT:
                             if change.payload.object_type == "character": # type: ignore
                                 self.update_character(change.payload.object_name, change.payload.changes) # type: ignore
-                            elif change.object_type == "scene": # type: ignore
+                            elif change.payload.object_type == "scene": # type: ignore
                                 self.update_scene(change.payload.object_name, change.payload.changes) # type: ignore
         except Exception as e:
             yield EventBuilder.error(f"Error occurred during narrative turn analysis: {e}")
@@ -517,17 +521,17 @@ if __name__ == "__main__":
         ]
     )
     chapter.setup_fight()
-    def print_game_sate():
-        for c in chapter.characters:
-            print(c.model_dump_json(indent=2))
-        print(chapter.scene.model_dump_json(indent=2)) # type: ignore
-        print(chapter.turn_order)
-    while True:
-        if chapter.get_active_character().is_player:
-            user_input = input(f"{ENTITY_COLOR}{chapter.get_active_character_name()} -->{Colors.RESET}  ")
-            if user_input == "?": 
-                print_game_sate()
-                continue
-            chapter.process_interaction(chapter.get_active_character(), user_input) # type: ignore
-        else:
-            dm_action = chapter.NPC_turn()
+    # def print_game_sate():
+    #     for c in chapter.characters:
+    #         print(c.model_dump_json(indent=2))
+    #     print(chapter.scene.model_dump_json(indent=2)) # type: ignore
+    #     print(chapter.turn_order)
+    # while True:
+    #     if chapter.get_active_character().is_player:
+    #         user_input = input(f"{ENTITY_COLOR}{chapter.get_active_character_name()} -->{Colors.RESET}  ")
+    #         if user_input == "?": 
+    #             print_game_sate()
+    #             continue
+    #         chapter.process_interaction(chapter.get_active_character(), user_input) # type: ignore
+    #     else:
+    #         dm_action = chapter.NPC_turn()

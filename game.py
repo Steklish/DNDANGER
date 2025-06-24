@@ -28,20 +28,20 @@ class Game:
         self.listeners = []
         self.listener_names = [] # character names
         self.generator = ObjectGenerator()
-        self.context = "Мост над пропастью"
+        self.context = "Чаща леса. Полночь"
         self.chapter = ChapterLogicFight(
             context = self.context,
             characters = [
-                self.generator.generate(Character, "(Shambling Sapling) с HP по 30, урон корнями и виноградными плетями. (NPC)", self.context, "Russian"),
-                self.generator.generate(Character, "(Shambling Sapling) с HP по 30, урон корнями и виноградными плетями. (NPC)", self.context, "Russian"),
-                self.generator.generate(Character, "странник из света (CR 1, кастует простые иллюзии, ослепление) ➤ Угрозы умеренные, но запоминающиеся. (enemy NPC)", self.context, "Russian"),
+                self.generator.generate(Character, "Энт с HP по 30, урон корнями и виноградными плетями. (NPC)", self.context, "Russian"),
+                # self.generator.generate(Character, "Призрак (какой-нибудь) с HP по 30, урон корнями и виноградными плетями. (NPC)", self.context, "Russian"),
+                # self.generator.generate(Character, "странник из света (CR 1, кастует простые иллюзии, ослепление) ➤ Угрозы умеренные, но запоминающиеся. (enemy NPC)", self.context, "Russian"),
                 # self.generator.generate(Character, "Яша Лава - ЛАвовый голем with full hp (10 hp) random inventory (non-player character)", self.context, "Russian"),
                 # self.generator.generate(Character, "Яша Лужа - Водяной голем with full hp (50 hp) random inventory (non-player character)", self.context, "Russian"),
-                self.generator.generate(Character, "Игрок 1 - боевой дворф with full hp (50 hp) random inventory (player character)", self.context, "Russian"),
+                self.generator.generate(Character, "Игорь - боевой дворф with full hp (50 hp) random inventory (player character)", self.context, "Russian"),
                 self.generator.generate(Character, "Олег - маг с кучей заклинаний with full hp (50 hp) random inventory (player character)", self.context, "Russian"),
             ]
         )
-        self.chapter.setup_fight()
+        self.chapter.game_mode = GameMode.NARRATIVE
         self.announce(EventBuilder.DM_message(self.chapter.scene.description)) # type: ignore
         message = {
             "message_text": self.chapter.scene.description, # type: ignore
@@ -77,6 +77,7 @@ class Game:
         self.listener_names.append(listener_char_name)
         await self.announce(EventBuilder.player_joined(listener_char_name, self.listener_names))
         try:
+            # это чтобы про подключении сразу обновить состояние клиента для того, кто подключился
             await self.announce_privately(EventBuilder.lock([self.chapter.get_active_character_name()], game_mode=self.chapter.game_mode.name), q)
             while True:
                 try:
@@ -125,10 +126,6 @@ class Game:
         Asynchronously broadcasts a message to all active listeners.
         """
         print(f"Broadcasting message to {len(self.listeners)} listeners: {msg}")
-
-        # To avoid one slow client blocking the announcement to others,
-        # we can create a task for each announcement.
-        # This runs them concurrently.
         tasks = []
         for q in self.listeners:
             # Create an awaitable task for each private announcement
@@ -152,6 +149,7 @@ class Game:
         
         player_to_game_interactions = self.chapter.process_interaction(self.chapter.get_character_by_name(character_name), interaction)
         await self.announce_from_the_game(player_to_game_interactions)     
+        print(f"{DEBUG_COLOR}Player {character_name} interaction processed{Colors.RESET}")
         await self.allow_current_character_turn()
 
     async def make_system_announcement(self, alert_text):
@@ -174,6 +172,9 @@ class Game:
                 self.add_message_to_history(message)
             if event["event"] == "alert":
                 await self.make_system_announcement(event["data"])
+            # elif event["event"] == "end_of_turn":
+            #     print("End of turn event received, allowing next character turn...")
+            #     await self.allow_current_character_turn()
             else:
                 await self.announce(event)
 
@@ -198,6 +199,7 @@ class Game:
             elif not cur_character.is_alive:
                 await self.make_system_announcement(f"Player {cur_character.name} is unable to take turns...")
                 self.chapter.move_to_next_turn()
+                await self.allow_current_character_turn()
             elif not cur_character.is_player:
                 print("Allowing NPC turn")
                 NPC_interaction = self.chapter.NPC_turn()

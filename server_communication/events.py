@@ -27,7 +27,6 @@ class EventBuilder:
         Returns:
             dict: Событие блокировки, содержащее список разрешенных игроков.
         """
-        print(f"Locking players: {allowed_players} in game mode: {game_mode}")
         return {
             "event": "lock",
             "allowed_players": allowed_players,
@@ -156,5 +155,12 @@ class EventBuilder:
         return {
             "event": "error",
             "error_message": error_message,
+            "sender": "server"
+        }
+        
+    @staticmethod
+    def end_of_turn():
+        return {
+            "event": "end_of_turn",
             "sender": "server"
         }
