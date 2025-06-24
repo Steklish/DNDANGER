@@ -63,12 +63,12 @@ document.addEventListener('DOMContentLoaded', async function() {
             case "lock":
                 if (data.allowed_players.includes(character_name)) {
                     unlock_input();
-                    if (data.game_mode == "NARRATIVE"){
-                        messageInput.placeholder = "Type something (story mode)..."
-                    }
                 } else {
-                    // Using strict inequality (!==) is generally safer than loose (!=)
                     lock_input(data.allowed_players.length !== 0);
+                }
+                if (data.game_mode == "NARRATIVE" && data.lock_all == false){
+                    unlock_input();
+                    messageInput.placeholder = "Type something (story mode)..."
                 }
                 break;
 

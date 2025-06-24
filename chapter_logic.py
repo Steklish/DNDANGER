@@ -227,7 +227,7 @@ Your response must be ONLY the complete, updated JSON object for the character. 
 
 
 
-    def action(self, character: Character, action_text: str, is_NPC = False):
+    async def action(self, character: Character, action_text: str, is_NPC = False):
         """
         Executes an action and immediately gets both the narrative and the structured changes.
         """
@@ -269,12 +269,13 @@ Your response must be ONLY the complete, updated JSON object for the character. 
             print(f"{SUCCESS_COLOR}All changes applied successfully{Colors.RESET}")    
             self.move_to_next_turn()
             self.context += f"</Action outcomes>"
-            yield from self.after_action(outcome)
+            async for value in self.after_action(outcome):
+                yield value
         else:
             self.context += f"\nNothinig happens...\n"
             yield EventBuilder.alert("Impossible to act...")
         
-    def askedDM(self, character: Character, question: str):
+    async def askedDM(self, character: Character, question: str):
         """
         Handles a character asking the DM a question.
         
@@ -325,7 +326,7 @@ Your response must be ONLY the complete, updated JSON object for the character. 
         print(f"{Colors.GREEN}context after{self.context} {Colors.RESET}")
         
 
-    def process_interaction(self, character: Character, interaction: str):
+    async def process_interaction(self, character: Character, interaction: str):
         """
         Processes a character's interaction, deciding the outcome of actions and questions.
         """
@@ -379,11 +380,13 @@ Provide your response as a single JSON object matching the `ClassifyInformationO
         if decision.decision: # type: ignore
             yield EventBuilder.user_intent_processed("info")
             print(f"{INFO_COLOR}Request for info {Colors.RESET}")
-            yield from self.askedDM(character, interaction)
+            async for value in self.askedDM(character, interaction):
+                yield value
         else:
             yield EventBuilder.user_intent_processed("action")
             print(f"{INFO_COLOR}Request for action {Colors.RESET}")
-            yield from self.action(character, interaction)
+            async for value in self.action(character, interaction):
+                yield value
         self.after_turn()
     
     def get_character_by_name(self, name:str) -> Character:
@@ -392,7 +395,8 @@ Provide your response as a single JSON object matching the `ClassifyInformationO
                 return char
         return self.characters[0]
     
-    def after_action(self, outcome:ActionOutcome):
+    
+    async def after_action(self, outcome:ActionOutcome):
         print("after action processing")
         prompt = self.prompter.get_turn_analysis_prompt(self, self.game_mode)
         analisys : TurnAnalysisOutcome = self.generator.generate(
@@ -401,22 +405,24 @@ Provide your response as a single JSON object matching the `ClassifyInformationO
             language="Russian"
         )
         print(f"\n{HEADER_COLOR}📝 Analyzing turn outcome...{Colors.RESET}")
-        # print(f"{DEBUG_COLOR}Raw prompt: {prompt}{Colors.RESET}")
         print(analisys)
         if self.game_mode != analisys.recommended_mode:
             self.game_mode = analisys.recommended_mode
             yield EventBuilder.alert(f'Game mode changed to <span class="keyword">{self.game_mode.name}</span>')
-        
+        if self.game_mode == GameMode.NARRATIVE:
+            async for event in self.after_narrative(): # type: ignore
+                yield event
     
-    def after_turn(self):
+    async def after_turn(self):
         print(f"\n{INFO_COLOR}📝 Processing after-turn effects...{Colors.YELLOW} {len(self.context)} chars of context {Colors.RESET}") # type: ignore
         if len(self.context) > MAX_CONTEXT_LENGTH_CHARS:  # type: ignore
             self.trim_context()
             if self.context: 
                 print(f"{SUCCESS_COLOR}✨ Context updated{Colors.RESET}")
         if self.game_mode == GameMode.NARRATIVE:
-            self.after_narrative()
-        
+            async for event in self.after_narrative(): # type: ignore
+                yield event
+
     def after_narrative(self):
         analisys : NarrativeTurnAnalysis = self.generator.generate(
             pydantic_model=NarrativeTurnAnalysis,
@@ -437,7 +443,7 @@ Provide your response as a single JSON object matching the `ClassifyInformationO
             yield EventBuilder.error(f"Error occurred during narrative turn analysis: {e}")
             print(f"{ERROR_COLOR}Error occurred during narrative turn analysis: {e}{Colors.RESET}")
 
-    def NPC_turn(self):
+    async def NPC_turn(self):
         """
         Handles the npc's turn in the fight.
         """
@@ -471,7 +477,8 @@ Provide your response as a single JSON object matching the `ClassifyInformationO
 Твой ответ:
 """
         NPC_action = self.classifier.general_text_llm_request(NPC_action_prompt)
-        yield from self.action(self.get_active_character(), NPC_action) # type: ignore
+        async for value in self.action(self.get_active_character(), NPC_action): # type: ignore
+            yield value
         self.after_turn()
         
 if __name__ == "__main__":

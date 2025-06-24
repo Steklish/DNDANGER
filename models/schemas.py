@@ -74,6 +74,7 @@ class Character(BaseModel):
     intelligence: int = Field(description="Интеллект (Intelligence). Измеряет остроту ума и способность к логическому мышлению.")
     wisdom: int = Field(description="Мудрость (Wisdom). Отражает здравомыслие, интуицию и гармонию с окружающим миром.")
     charisma: int = Field(description="Харизма (Charisma). Измеряет силу личности, умение убеждать и личное обаяние.")
+    
 class SceneObject(BaseModel):
     """
     Pydantic schema for a general object within a scene, like a door, tree, or statue.

@@ -18,7 +18,7 @@ class EventBuilder:
 
 
     @staticmethod
-    def lock(allowed_players: List[str], game_mode : GameMode = GameMode.COMBAT):
+    def lock(allowed_players: List[str], game_mode : str = "COMBAT"):
         """Создает событие блокировки/разблокировки для контроля очередности ходов игроков.
 
         Args:
@@ -27,14 +27,16 @@ class EventBuilder:
         Returns:
             dict: Событие блокировки, содержащее список разрешенных игроков.
         """
+        print(f"Locking players: {allowed_players} in game mode: {game_mode}")
         return {
             "event": "lock",
             "allowed_players": allowed_players,
-            "game_mode" : game_mode
+            "game_mode" : game_mode,
+            "lock_all": False
         }
         
     @staticmethod
-    def lock_all():
+    def lock_all(game_mode : str = "COMBAT"):
         """
         Создает блокировку.
 
@@ -43,7 +45,9 @@ class EventBuilder:
         """
         return {
             "event": "lock",
-            "allowed_players": []
+            "allowed_players": [],
+            "game_mode" : game_mode,
+            "lock_all": True
         }
 
     @staticmethod

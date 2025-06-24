@@ -12,19 +12,19 @@ from game import Game
 
 # --- FastAPI Setup ---
 load_dotenv()
-app = FastAPI()  # Create the FastAPI app instance
+app = FastAPI() 
 app.mount("/static", StaticFiles(directory="static"), name="static")
-game = Game()    # Your game logic remains the same
-
-# Setup for rendering Jinja2 HTML templates
 templates = Jinja2Templates(directory="templates")
 
-# --- Pydantic Model for Data Validation ---
-# This replaces the need to manually parse JSON and check for keys.
-# FastAPI will automatically validate the incoming request body against this model.
 class InteractionPayload(BaseModel):
     character: str
     message: str
+
+@app.on_event("startup")
+async def startup_event():
+    global game
+    game = await Game.create()  # Only inside an async function!
+    await game.allow_current_character_turn()
 
 @app.get('/', response_class=HTMLResponse)
 async def index(request: Request):
@@ -47,14 +47,14 @@ async def login(request: Request):
 async def interact(payload: InteractionPayload): 
     print(f"data received from {payload.character}\n DATA:{payload.model_dump()}")
     
-    game.handle_interaction_from_player(
+    await game.handle_interaction_from_player(
         interaction=payload.message,
         character_name=payload.character
     )
     return {"status": "ok"}
 
 @app.get('/player/{name}', response_class=HTMLResponse)
-async def player(request: Request, name: str): # Path parameters are type-hinted
+async def player(request: Request, name: str):
     return templates.TemplateResponse("player.html", {
         "request": request, 
         "character_name": name

@@ -73,6 +73,7 @@ class Prompter:
 3.  **The Meaning of `is_legal`:** The `is_legal` field is STRICTLY about **rule adherence**, not difficulty.
     *   `is_legal: true` means the action is theoretically possible within the game's rules, even if it's incredibly difficult or foolish.
     *   `is_legal: false` is reserved ONLY for actions that break fundamental game rules. A difficult or likely-to-fail action is NOT illegal.
+    *   if an action is illegal, the `narrative_description` must clearly explain why it violates the rules. The `structural_changes` field should be empty (`[]`).
 </PHILOSOPHY_AND_CORE_MECHANICS>
 
 <RULES>
