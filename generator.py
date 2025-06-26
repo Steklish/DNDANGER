@@ -95,7 +95,7 @@ class ObjectGenerator:
         IMPORTANT: Your response MUST be ONLY the valid JSON object that conforms to the schema. Do not include any other text, explanations, or markdown formatting like ```json.
         """
         
-        print(f"\n{HEADER_COLOR}📡 Sending request to Gemini{Colors.RESET} for: {ENTITY_COLOR}{pydantic_model.__name__}{Colors.RESET} (Language: {INFO_COLOR}{language or 'Default'}{Colors.RESET})")
+        print(f"\n{HEADER_COLOR}Sending request to Gemini{Colors.RESET} for: {ENTITY_COLOR}{pydantic_model.__name__}{Colors.RESET} (Language: {INFO_COLOR}{language or 'Default'}{Colors.RESET})")
         response = self.model.generate_content(full_prompt)
 
         try:
@@ -104,11 +104,11 @@ class ObjectGenerator:
             return pydantic_model(**parsed_data)
 
         except (json.JSONDecodeError, ValidationError, ValueError) as e:
-            print(f"{ERROR_COLOR}❌ Error processing Gemini response:{Colors.RESET} {e}")
+            print(f"{ERROR_COLOR}Error processing Gemini response:{Colors.RESET} {e}")
             print(f"{WARNING_COLOR}Raw Response from API:{Colors.RESET}")
             print(response.text)
             print(f"{Colors.DIM}{'─' * 30}{Colors.RESET}")
-            raise ValueError("Failed to generate a valid Pydantic instance from the API's text response.")
+            raise e
 
 # --- Main execution block (Updated with Russian examples and colorful output) ---
 if __name__ == "__main__":
@@ -134,7 +134,7 @@ if __name__ == "__main__":
         
         generation_time = time.time() - start_time
         generation_times.append(("Random Russian Character", generation_time))
-        print(f"\n{SUCCESS_COLOR}✅ Generated Random Russian Character{Colors.RESET} ({TIME_COLOR}took {generation_time:.2f} seconds{Colors.RESET}):")
+        print(f"\n{SUCCESS_COLOR}Generated Random Russian Character{Colors.RESET} ({TIME_COLOR}took {generation_time:.2f} seconds{Colors.RESET}):")
         print(random_russian_character.model_dump_json(indent=2))
 
         # # --- Example 2: Generate a SPECIFIC item in RUSSIAN ---

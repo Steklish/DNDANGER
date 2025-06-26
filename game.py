@@ -48,6 +48,7 @@ class Game:
             "sender_name": "DM"
         }
         self.add_message_to_history(message)
+        self.turn_completed_event = asyncio.Event()
         
         
     @classmethod
@@ -57,12 +58,57 @@ class Game:
         """
         self = cls()  # Synchronous __init__
         return self
+
+    async def game_loop(self):
+        """
+        The main game loop that manages turns and game state based on the current mode.
+        """
+        await asyncio.sleep(1) # Small delay to let server initialize
+        while True:
+            if self.chapter.game_mode == GameMode.COMBAT:
+                active_char = self.chapter.get_active_character()
+                print(f"{INFO_COLOR}It's {active_char.name}'s turn (COMBAT MODE).{Colors.RESET}")
+
+                if active_char.is_player:
+                    await self.announce(EventBuilder.lock([active_char.name], game_mode=self.chapter.game_mode.name))
+                    try:
+                        await asyncio.wait_for(self.turn_completed_event.wait(), timeout=300.0) # 5 min timeout
+                    except asyncio.TimeoutError:
+                        print(f"{ERROR_COLOR}Player {active_char.name} timed out. Skipping turn.{Colors.RESET}")
+                        await self.make_system_announcement(f"Игрок {active_char.name} пропустил свой ход.")
+                        self.chapter.move_to_next_turn()
+                    finally:
+                        self.turn_completed_event.clear()
+                else: # NPC's turn in COMBAT
+                    await self.announce(EventBuilder.lock_all(self.chapter.game_mode.name))
+                    await self.make_system_announcement(f"Ход {active_char.name}...")
+                    await self.announce_from_the_game(self.chapter.NPC_turn())
+                    self.chapter.move_to_next_turn()
+                    await self.announce_from_the_game(self.chapter.after_turn())
+                    await asyncio.sleep(1)
+
+            elif self.chapter.game_mode == GameMode.NARRATIVE:
+                # In Narrative mode, all players can act. The loop waits for any of them.
+                player_names = [p.name for p in self.chapter.characters if p.is_player]
+                print(f"{INFO_COLOR}Waiting for player actions (NARRATIVE MODE). Allowed: {player_names}{Colors.RESET}")
+                await self.announce(EventBuilder.lock(player_names, game_mode=self.chapter.game_mode.name))
+                
+                await self.turn_completed_event.wait() # Wait for any player to act
+                self.turn_completed_event.clear() # Reset for the next interaction
+                print(f"{INFO_COLOR}Narrative action processed. Continuing...{Colors.RESET}")
+                await asyncio.sleep(1) # Brief pause after a narrative action
+            
+            else: # Should not happen
+                print(f"{ERROR_COLOR}Unknown game mode: {self.chapter.game_mode}. Defaulting to NARRATIVE.{Colors.RESET}")
+                self.chapter.game_mode = GameMode.NARRATIVE
+                await asyncio.sleep(5)
+
     
     async def listen(self, sid : str, listener_char_name : str = "Unknown"):
         """
         Creates a new queue for a listener, adds it to the list,
         and yields messages from it. It also sends a keep-alive signal
-        periodically to prevent connection timeouts.
+         periodically to prevent connection timeouts.
         """
         q = asyncio.Queue(maxsize=BUFFER_SIZE_FOR_QUEUE)
         print(f"{INFO_COLOR}Listener for {listener_char_name} connected. {Colors.RESET}\n Total listeners {len(self.listeners)}")
@@ -92,6 +138,7 @@ class Game:
             self.listener_names.remove(listener_char_name)
             print(f"{INFO_COLOR}Listener for {listener_char_name} {Colors.RED} disconnected. {Colors.RESET}\n Total listeners {len(self.listeners)}")
             await self.announce(EventBuilder.player_left(listener_char_name, self.listener_names))
+            
     
     
     async def announce_privately(self, msg: dict, q: asyncio.Queue):
@@ -120,6 +167,7 @@ class Game:
                 # we couldn't get an item, and it's still full. The client is
                 # completely stuck. We'll just drop the new message.
                 print(f"Listener queue still full after attempting to discard. Dropping new message: {msg}")
+                raise asyncio.QueueFull
             
     async def announce(self, msg: dict):
         """
@@ -138,6 +186,14 @@ class Game:
             
                     
     async def handle_interaction_from_player(self, interaction:str, character_name:str):
+        # --- Turn Validation ---
+        active_char_name = self.chapter.get_active_character_name()
+        if self.chapter.game_mode == GameMode.COMBAT and character_name != active_char_name:
+            print(f"{ERROR_COLOR}Player {character_name} tried to act out of turn. It's {active_char_name}'s turn.{Colors.RESET}")
+            # Optionally, send a private message to the player who tried to act
+            # await self.announce_privately(EventBuilder.error("It's not your turn!"), q_for_player)
+            return # Stop processing
+
         message = {
             "message_text": interaction,
             "sender_name": character_name
@@ -147,10 +203,15 @@ class Game:
         
         await self.announce(EventBuilder.lock_all(self.chapter.game_mode.name))
         
-        player_to_game_interactions = self.chapter.process_interaction(self.chapter.get_character_by_name(character_name), interaction)
-        await self.announce_from_the_game(player_to_game_interactions)     
+        event_generator, was_action = await self.chapter.process_interaction(self.chapter.get_character_by_name(character_name), interaction)
+        await self.announce_from_the_game(event_generator)     
+        
+        if was_action and self.chapter.game_mode == GameMode.COMBAT:
+            self.chapter.move_to_next_turn()
+
+        await self.announce_from_the_game(self.chapter.after_turn())
         print(f"{DEBUG_COLOR}Player {character_name} interaction processed{Colors.RESET}")
-        await self.allow_current_character_turn()
+        self.turn_completed_event.set()
 
     async def make_system_announcement(self, alert_text):
         await self.announce(EventBuilder.alert(alert_text))
@@ -161,20 +222,24 @@ class Game:
         self.add_message_to_history(message)
         
     async def announce_from_the_game(self, generator):
-        async for event  in generator:
-            print("Event recieved from the game:")
+        async for event in generator:
+            print("Event received from the game:")
             print(event)
-            if event["event"] == "message" and (event["sender"] == "DM"):
+            
+            # Handle specific events that require special processing
+            if event.get("event") == "message" and event.get("sender") == "DM":
                 message = {
                     "message_text": event["data"],
                     "sender_name": event["sender"]
                 }
                 self.add_message_to_history(message)
-            if event["event"] == "alert":
+                await self.announce(event) # Also broadcast the message
+                
+            elif event.get("event") == "alert":
+                # Use make_system_announcement to ensure it's also added to history
                 await self.make_system_announcement(event["data"])
-            # elif event["event"] == "end_of_turn":
-            #     print("End of turn event received, allowing next character turn...")
-            #     await self.allow_current_character_turn()
+                
+            # Default case: broadcast any other event to all listeners
             else:
                 await self.announce(event)
 
@@ -185,31 +250,3 @@ class Game:
         self.message_history.append(message)
         if len(self.message_history) > MAX_MESSAGE_HISTORY_LENGTH:
             self.message_history.pop(0)
-            
-    async def allow_current_character_turn(self):
-        print("allowing some turn...")
-        print(f"Current game mode: {self.chapter.game_mode}, current character: {self.chapter.get_active_character_name()}")
-        # Loop until a living player is found or all NPCs/Dead are skipped
-        if self.chapter.game_mode == GameMode.COMBAT:
-            cur_character = self.chapter.get_active_character()
-            if cur_character.is_alive and cur_character.is_player:
-                print("Allowing player turn")
-                await self.announce(EventBuilder.lock([cur_character.name], game_mode=self.chapter.game_mode.name))
-                return
-            elif not cur_character.is_alive:
-                await self.make_system_announcement(f"Player {cur_character.name} is unable to take turns...")
-                self.chapter.move_to_next_turn()
-                await self.allow_current_character_turn()
-            elif not cur_character.is_player:
-                print("Allowing NPC turn")
-                NPC_interaction = self.chapter.NPC_turn()
-                await self.announce_from_the_game(NPC_interaction)
-                self.chapter.move_to_next_turn()
-            await self.announce(EventBuilder.lock([self.chapter.get_active_character_name()], game_mode=self.chapter.game_mode.name))
-        else:
-            print("Allowing narrative turn (allowing everyone to play)")
-            allowed_players = [char.name for char in self.chapter.characters if char.is_alive]
-            event = EventBuilder.lock(allowed_players, game_mode=GameMode.NARRATIVE.name)
-            await self.announce(event)
-            
-                

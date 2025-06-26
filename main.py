@@ -1,3 +1,4 @@
+import asyncio
 import uuid
 import uvicorn  # For running the app
 from dotenv import load_dotenv
@@ -26,7 +27,7 @@ class InteractionPayload(BaseModel):
 async def startup_event():
     global game
     game = await Game.create()  # Only inside an async function!
-    await game.allow_current_character_turn()
+    asyncio.create_task(game.game_loop())
 
 
 @app.get("/favicon.ico", include_in_schema=False)

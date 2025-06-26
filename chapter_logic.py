@@ -36,7 +36,7 @@ class ChapterLogicFight:
     
     def shuffle_turns(self):
         new_turns : TurnList = self.classifier.generate(
-            contents=str(self.context) + f"<cahracter list>{json.dumps(self.turn_order)}</cahracter list> You need to provide all those names in the order that is logical to currect scene. Example: Elly attacs the Goblin -> Elly have wasted her tur attacking so the next turn is likely to be goblins tern and only after the Goblin other characters should be placed in turn order, where Elly is likely to be in the endo of the list of turns. All the characters should be placed in a new turn list. No matter if they cant take rutns or dont participate for any reason",
+            contents=str(self.context) + f"<cahracter list>{json.dumps(self.turn_order)}</cahracter list> You need to provide those names in the order that is logical to currect scene. Example: Elly attacs the Goblin -> Elly have wasted her tur attacking so the next turn is likely to be goblins tern and only after the Goblin other characters should be placed in turn order, where Elly is likely to be in the endo of the list of turns. All the characters should be placed in a new turn list. No matter if they cant take rutns or dont participate for any reason. IMPORTANT: not every character has to be in the turn list. If a player is far from the finght it should not be in the turn list. Note that if a character is not directly participating in the fight but hiding near by they should be as=lso included to the fight order. Take characters initiative into account when setting up turn order.",
             pydantic_model=TurnList,
         ) # type: ignore
         print(f"Raw turn shuffle result:{DEBUG_COLOR} {new_turns.turn_list}{Colors.RESET}")
@@ -65,10 +65,10 @@ class ChapterLogicFight:
                 """,
                 language=self.language
             )
-            print(f"{SUCCESS_COLOR}✨ Scene updated successfully!{Colors.RESET}")
+            print(f"{SUCCESS_COLOR} Scene updated successfully!{Colors.RESET}")
         except Exception as e:
-            print(f"{ERROR_COLOR}❌ Error updating scene: {e}{Colors.RESET}")
-            return
+            print(f"{ERROR_COLOR} Error updating scene: {e}{Colors.RESET}")
+            raise e
     
     # Assuming your Character class and other imports are defined elsewhere
 # from your_models_file import Character, Item, Ability
@@ -136,17 +136,18 @@ Your response must be ONLY the complete, updated JSON object for the character. 
                 language=self.language
             )
             self.characters.append(updated_character)
-            print(f"{SUCCESS_COLOR}✨ Character '{updated_character.name}' updated successfully!{Colors.RESET}")
+            print(f"{SUCCESS_COLOR} Character '{updated_character.name}' updated successfully!{Colors.RESET}")
             
             # Add a clear message if the character's life status changed
             if not updated_character.is_alive and character.is_alive:
-                print(f"{ERROR_COLOR}💀 Character {updated_character.name} has died!{Colors.RESET}")
+                print(f"{ERROR_COLOR} Character {updated_character.name} has died!{Colors.RESET}")
 
         except Exception as e:
-            print(f"{ERROR_COLOR}❌ Error updating character: {e}{Colors.RESET}")
+            print(f"{ERROR_COLOR} Error updating character: {e}{Colors.RESET}")
             # Optionally re-add the original character on any failure
             if 'character' in locals() and character not in self.characters: # type: ignore
                 self.characters.append(character) # type: ignore
+            raise e
             
     def generate_scene(self):
         # scene context is the same one as the chapter context (context at creating the chapter)
@@ -162,9 +163,9 @@ Your response must be ONLY the complete, updated JSON object for the character. 
             language=self.language
         )
 
-        print(f"\n{SUCCESS_COLOR}✨ Generated Scene:{Colors.RESET} {ENTITY_COLOR}{self.scene.name}{Colors.RESET}")
+        print(f"\n{SUCCESS_COLOR}Generated Scene:{Colors.RESET} {ENTITY_COLOR}{self.scene.name}{Colors.RESET}")
         print(f"{INFO_COLOR} DIfficulty: {scene_d.scene_difficulty}{Colors.RESET}") # type: ignore
-        print(f"{INFO_COLOR}📜 Description:{Colors.RESET} {self.scene.description}")
+        print(f"{INFO_COLOR} Description:{Colors.RESET} {self.scene.description}")
 
 
     def setup_fight(self):
@@ -172,7 +173,7 @@ Your response must be ONLY the complete, updated JSON object for the character. 
         Initializes the fight by generating objects and their actions based on the context.
         """
         self.game_mode = GameMode.COMBAT
-        print(f"\n{HEADER_COLOR}🎲 Generating Scene...{Colors.RESET}")
+        print(f"\n{HEADER_COLOR} Generating Scene...{Colors.RESET}")
         
         
         # Here i remove unnecessary parts from the context to reduce memory usage
@@ -270,7 +271,6 @@ Your response must be ONLY the complete, updated JSON object for the character. 
                 )
                 yield EventBuilder.alert(f"{change.object_name}: {change.changes}")
             print(f"{SUCCESS_COLOR}All changes applied successfully{Colors.RESET}")    
-            self.move_to_next_turn()
             self.context += f"</Action outcomes>"
             async for value in self.after_action(outcome):
                 yield value
@@ -332,6 +332,7 @@ Your response must be ONLY the complete, updated JSON object for the character. 
     async def process_interaction(self, character: Character, interaction: str):
         """
         Processes a character's interaction, deciding the outcome of actions and questions.
+        Returns a tuple containing the event generator and a boolean indicating if a turn-consuming action was taken.
         """
         decision: ClassifyInformationOrActionRequest = self.classifier.generate(
     contents=f"""
@@ -381,16 +382,11 @@ Provide your response as a single JSON object matching the `ClassifyInformationO
     pydantic_model=ClassifyInformationOrActionRequest
 )  # type: ignore
         if decision.decision: # type: ignore
-            yield EventBuilder.user_intent_processed("info")
             print(f"{INFO_COLOR}Request for info {Colors.RESET}")
-            async for value in self.askedDM(character, interaction):
-                yield value
+            return self.askedDM(character, interaction), False
         else:
-            yield EventBuilder.user_intent_processed("action")
             print(f"{INFO_COLOR}Request for action {Colors.RESET}")
-            async for value in self.action(character, interaction):
-                yield value
-        self.after_turn()
+            return self.action(character, interaction), True
     
     def get_character_by_name(self, name:str) -> Character:
         for char in self.characters:
@@ -407,7 +403,7 @@ Provide your response as a single JSON object matching the `ClassifyInformationO
             prompt=prompt,
             language="Russian"
         )
-        print(f"\n{HEADER_COLOR}📝 Analyzing turn outcome...{Colors.RESET}")
+        print(f"\n{HEADER_COLOR} Analyzing turn outcome...{Colors.RESET}")
         print(analisys)
         if self.game_mode != analisys.recommended_mode:
             self.game_mode = analisys.recommended_mode
@@ -418,11 +414,11 @@ Provide your response as a single JSON object matching the `ClassifyInformationO
         yield EventBuilder.end_of_turn()
     
     async def after_turn(self):
-        print(f"\n{INFO_COLOR}📝 Processing after-turn effects...{Colors.YELLOW} {len(self.context)} chars of context {Colors.RESET}") # type: ignore
+        print(f"\n{INFO_COLOR} Processing after-turn effects...{Colors.YELLOW} {len(self.context)} chars of context {Colors.RESET}") # type: ignore
         if len(self.context) > MAX_CONTEXT_LENGTH_CHARS:  # type: ignore
             self.trim_context()
             if self.context: 
-                print(f"{SUCCESS_COLOR}✨ Context updated{Colors.RESET}")
+                print(f"{SUCCESS_COLOR} Context updated{Colors.RESET}")
         if self.game_mode == GameMode.NARRATIVE:
             async for event in self.after_narrative(): # type: ignore
                 yield event
@@ -432,28 +428,44 @@ Provide your response as a single JSON object matching the `ClassifyInformationO
             pydantic_model=NarrativeTurnAnalysis,
             prompt=self.prompter.get_narrative_analysis_prompt(self)
         )
-        print(f"\n{HEADER_COLOR}📝 Analyzing narrative turn outcome...{Colors.RESET}")
+        print(f"\n{HEADER_COLOR} Analyzing narrative turn outcome...{Colors.RESET}")
         print(f"{DEBUG_COLOR}Raw analysis: {analisys}{Colors.RESET}")
         try:
-            for change in analisys.proactive_world_changes:
-                if change.change_type == ProactiveChangeType.ADD_OBJECT or \
-                    change.change_type == ProactiveChangeType.REMOVE_OBJECT or \
-                        change.change_type == ProactiveChangeType.UPDATE_OBJECT:
-                            if change.payload.object_type == "character": # type: ignore
-                                self.update_character(change.payload.object_name, change.payload.changes) # type: ignore
-                            elif change.payload.object_type == "scene": # type: ignore
-                                self.update_scene(change.payload.object_name, change.payload.changes) # type: ignore
+            for i, change in enumerate(analisys.proactive_world_changes, 1):
+                # Ensure change_type is a valid enum member before matching
+                if not isinstance(change.change_type, ProactiveChangeType):
+                    print(f"{WARNING_COLOR}Skipping invalid change type: {change.change_type}{Colors.RESET}")
+                    continue
+
+                payload = change.payload # type: ignore
+                match change.change_type: # type: ignore
+                    case ProactiveChangeType.ADD_OBJECT | ProactiveChangeType.UPDATE_OBJECT | ProactiveChangeType.REMOVE_OBJECT: # type: ignore
+                        if payload.object_type == "character": # type: ignore
+                            await self.update_character(payload.object_name, payload.changes) # type: ignore
+                        elif payload.object_type == "scene": # type: ignore
+                            await self.update_scene(payload.object_name, payload.changes) # type: ignore
+                        
+                        # Yield events to notify clients # type: ignore
+                        yield EventBuilder.alert(f"{payload.object_name}: {payload.changes}") # type: ignore
+                        yield EventBuilder.state_update_required( # type: ignore
+                            update=f"{payload.object_name} был обновлен ({payload.changes})",  # type: ignore
+                            total=len(analisys.proactive_world_changes),  # type: ignore
+                            current=i # type: ignore
+                        ) # type: ignore
+                    case _:
+                        # This case handles any other valid enum members that might be added in the future
+                        print(f"{WARNING_COLOR}Unhandled proactive change type: {change.change_type}{Colors.RESET}")
+
         except Exception as e:
             yield EventBuilder.error(f"Error occurred during narrative turn analysis: {e}")
             print(f"{ERROR_COLOR}Error occurred during narrative turn analysis: {e}{Colors.RESET}")
+            raise e
 
     async def NPC_turn(self):
         """
         Handles the npc's turn in the fight.
         """
         print(f"\n{HEADER_COLOR}NPC's turn:{Colors.RESET}")
-        # Here you can implement enemy actions, AI logic, etc.
-        # For now, we will just simulate an enemy action
         NPC_action_prompt = f"""
 <ROLE>
 Ты — искусственный интеллект, управляющий неигровым персонажем (NPC) в бою.
@@ -481,9 +493,8 @@ Provide your response as a single JSON object matching the `ClassifyInformationO
 Твой ответ:
 """
         NPC_action = self.classifier.general_text_llm_request(NPC_action_prompt)
-        async for value in self.action(self.get_active_character(), NPC_action): # type: ignore
+        async for value in self.action(self.get_active_character(), NPC_action, is_NPC=True):
             yield value
-        self.after_turn()
         
 if __name__ == "__main__":
     load_dotenv()

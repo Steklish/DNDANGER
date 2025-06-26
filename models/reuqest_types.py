@@ -72,10 +72,16 @@ class ProactiveChangeType(str, Enum):
     """
     Enumerates the types of proactive changes the world or story can undergo.
     """
+    ADD_CHARACTER = "ADD_CHARACTER"
+    REMOVE_CHARACTER = "REMOVE_CHARACTER"
+    UPDATE_CHARACTER = "UPDATE_CHARACTER"
+    
     ADD_OBJECT = "ADD_OBJECT"
     REMOVE_OBJECT = "REMOVE_OBJECT"
     UPDATE_OBJECT = "UPDATE_OBJECT"
+    
     CHANGE_SCENE = "CHANGE_SCENE"
+    UPDATE_SCENE = "UPDATE_SCENE"
 
 class ProactiveChange(BaseModel):
     """

@@ -30,7 +30,7 @@ class Classifier:
         
     def generate(self, contents: str, pydantic_model: Type[T], response_mime_type: str = "application/json"):
         try:
-            print(f"{INFO_COLOR}🤖 Generating content with model:{Colors.RESET} {ENTITY_COLOR}{self.model}{Colors.RESET}")
+            print(f"{INFO_COLOR}Generating content with model:{Colors.RESET} {ENTITY_COLOR}{self.model}{Colors.RESET}")
             response = self.client.models.generate_content(
                 model=self.model, # type: ignore
                 contents=contents,
@@ -41,11 +41,12 @@ class Classifier:
             )
             return response.parsed
         except Exception as e:
-            return None
+            print(f"{ERROR_COLOR}Error generating content: {e}{Colors.RESET}")
+            raise e
        
     def generate_list(self, contents: str, pydantic_model: Type[T], response_mime_type: str = "application/json"):
         try:
-            print(f"{INFO_COLOR}🤖 Generating content with model:{Colors.RESET} {ENTITY_COLOR}{self.model}{Colors.RESET}")
+            print(f"{INFO_COLOR}Generating content with model:{Colors.RESET} {ENTITY_COLOR}{self.model}{Colors.RESET}")
             response = self.client.models.generate_content(
                 model=self.model, # type: ignore
                 contents=contents,
@@ -56,7 +57,8 @@ class Classifier:
             )
             return response.parsed
         except Exception as e:
-            return None
+            print(f"{ERROR_COLOR}Error generating content: {e}{Colors.RESET}")
+            raise e
         
         
         
@@ -65,9 +67,9 @@ class Classifier:
         contents: str,
         language: str = "Russian",
         response_mime_type: str = "text/plain"
-    ) -> Optional[str]:
+    ) -> str:
         """
-        Makes a clear text request to the LLM with improved language handling.
+        Makes a clear text request to the LLM, ensuring a non-empty string response.
 
         Args:
             contents: The primary prompt or content for the LLM.
@@ -75,33 +77,38 @@ class Classifier:
             response_mime_type: The expected MIME type for the response.
 
         Returns:
-            The response text as a string if successful, otherwise None.
+            The response text as a string.
+
+        Raises:
+            ValueError: If the LLM returns an empty or null response.
+            Exception: Propagates exceptions from the underlying API call.
         """
-        # --- IMPROVEMENT: A simple, clear header for the prompt ---
-        # This gives the language instruction priority and context without over-engineering.
-        # It also fixes the 'Language' vs 'language' bug.
         full_prompt = (
             f"Задание: Ответь на следующий запрос на {language} языке.\n"
-            "---"
-            f"\n{contents}"
+            "---\n"
+            f"{contents}"
         )
 
         try:
-            print(f"{INFO_COLOR}🤖 Making text request to model: {ENTITY_COLOR}{self.model}{Colors.RESET}")
-            # The full_prompt is now used in the API call
+            print(f"{INFO_COLOR}Making text request to model: {ENTITY_COLOR}{self.model}{Colors.RESET}")
             response = self.client.models.generate_content(
-                model=self.model, # type: ignore
+                model=self.model,  # type: ignore
                 contents=full_prompt,
                 config={
-					"response_mime_type": response_mime_type,
-				}
+                    "response_mime_type": response_mime_type,
+                }
             )
+            
             if response.text:
                 return response.text
             else:
-                return None
+                # If the response or its text is empty, it's a failure case.
+                raise ValueError("LLM returned an empty response.")
+                
         except Exception as e:
-            return None
+            print(f"{ERROR_COLOR}Error during general text LLM request: {e}{Colors.RESET}")
+            # Re-raise the exception to be handled by the caller.
+            raise
         
         
 if __name__ == "__main__":

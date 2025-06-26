@@ -1,6 +1,6 @@
 // Инициализируем обработчики событий после загрузки DOM
-document.addEventListener('DOMContentLoaded', async function() {
-    
+document.addEventListener('DOMContentLoaded', function() {
+    let lockInputNonce = 0;
     // Получаем ссылки на основные элементы интерфейса
     const messageInput = document.getElementById('message-input');
     const sendButton = document.getElementById('send-button');
@@ -15,10 +15,18 @@ document.addEventListener('DOMContentLoaded', async function() {
     // Получаем имя игрока из localStorage (установленное при логине)
     const currentPlayerName = localStorage.getItem('playerName');
     
-    if (await get_current_character() != character_name){
-        console.log("Other player's turn")
-        lock_input()
-    }
+    // Non-blocking initial check for player's turn
+    get_current_character().then(name => {
+        if (name !== character_name) {
+            console.log("Other player's turn");
+            lock_input();
+        }
+    }).catch(error => {
+        console.error("Initial character check failed:", error);
+        // Decide if we should lock the input on failure as a safe default
+        lock_input(); 
+    });
+
     // Если имя не установлено, перенаправляем на страницу логина
     if (!currentPlayerName) {
         window.location.href = '/login';
@@ -68,7 +76,9 @@ document.addEventListener('DOMContentLoaded', async function() {
                 }
                 if (data.game_mode == "NARRATIVE" && data.lock_all == false){
                     unlock_input();
-                    messageInput.placeholder = "Type something (story mode)..."
+                    setTimeout(() => {
+                        messageInput.placeholder = "Type something (story mode)..."
+                    }, 100);
                 }
                 break;
 
@@ -121,12 +131,27 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
 
     async function lock_input(is_waiting = true) {
+        const nonce = ++lockInputNonce;
         playerWaitLoading.style.display = "";
         messageInput.disabled = true
         sendButton.disabled = true
-        messageInput.placeholder = is_waiting 
-            ? `Wait for your turn (${await get_current_character()}'s turn)...` 
-            : `Processing something...`;
+
+        if (is_waiting) {
+            messageInput.placeholder = `Wait for your turn...`;
+            try {
+                const name = await get_current_character();
+                if (nonce === lockInputNonce) {
+                    messageInput.placeholder = `Wait for your turn (${name}'s turn)...`;
+                }
+            } catch (error) {
+                console.error("Failed to get current character:", error);
+                if (nonce === lockInputNonce) {
+                    messageInput.placeholder = `Wait for your turn...`; // Fallback
+                }
+            }
+        } else {
+            messageInput.placeholder = `Processing something...`;
+        }
     }
 
 
@@ -146,43 +171,78 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
     }
 
+    const PLAYER_COLORS = 8; // Number of player colors defined in CSS
+
+    function simpleHashCode(str) {
+        let hash = 0;
+        for (let i = 0; i < str.length; i++) {
+            const char = str.charCodeAt(i);
+            hash = (hash << 5) - hash + char;
+            hash |= 0; // Convert to 32bit integer
+        }
+        return Math.abs(hash);
+    }
+
+    function getPlayerColor(name) {
+        const hash = simpleHashCode(name);
+        const colorIndex = (hash % PLAYER_COLORS) + 1;
+        return {
+            primary: `var(--player-color-${colorIndex})`,
+            bg: `var(--player-color-${colorIndex}-bg)`
+        };
+    }
+
+    function setGlobalTheme(name) {
+        const playerColor = getPlayerColor(name);
+        document.body.style.setProperty('--active-player-color', playerColor.primary);
+        document.body.style.setProperty('--active-player-color-bg', playerColor.bg);
+    }
+
+    // Set the initial theme based on the current character
+    setGlobalTheme(character_name);
+
     function addMessage(messageText, senderName) {
         const scrollThreshold = 60; 
         const isScrolledToBottom = chatMessages.scrollHeight - chatMessages.clientHeight <= chatMessages.scrollTop + scrollThreshold;
-        if (senderName == "system"){
-            let new_message = `
-            <div class="message-system">
-                <div class="message-text-system">
-                ${messageText}
-                </div>
-            </div>`;
-            chatMessages.innerHTML += new_message;
-        }
-        else{
+        
+        const messageElement = document.createElement('div');
+
+        if (senderName === "system") {
+            messageElement.className = 'message-system';
+            messageElement.innerHTML = `<div class="message-text-system">${messageText}</div>`;
+        } else {
             let message_src = "";
-            if (senderName == character_name) {
-                message_src = "sent";
+            if (senderName === character_name) {
+                message_src = "sent player-message"; // Add player-message class
             } else {
-                message_src = "received";
+                message_src = "received player-message"; // Add player-message class
             }
     
             let is_DM = "";
-            if (senderName == "DM") { is_DM = "DM_message" }
+            if (senderName === "DM") { 
+                is_DM = "DM_message";
+            }
     
-            let new_message = `
-            <div class="message ${message_src} ${is_DM}">
-                ${senderName != character_name ? `<div class="sender-name">${senderName}</div>` : ""} 
+            messageElement.className = `message ${message_src} ${is_DM}`;
+            messageElement.innerHTML = `
+                ${senderName !== character_name ? `<div class="sender-name">${senderName}</div>` : ""} 
                 <div class="message-text">
-                ${marked.parse(messageText.trimStart())}
+                    ${marked.parse(messageText.trimStart())}
                 </div>
-            </div>
             `;
-            chatMessages.innerHTML += new_message;
+
+            // Assign a unique color to other players
+            if (senderName !== "DM") {
+                const playerColor = getPlayerColor(senderName);
+                messageElement.style.setProperty('--player-color', playerColor.primary);
+                messageElement.style.setProperty('--player-color-bg', playerColor.bg);
+            }
         }
+
+        chatMessages.appendChild(messageElement);
 
         // --- Scroll down ONLY if the user was already at the bottom ---
         if (isScrolledToBottom) {
-            // You can use scrollIntoView on the new last element...
             chatMessages.lastElementChild.scrollIntoView({ behavior: 'smooth' });
         }
     }

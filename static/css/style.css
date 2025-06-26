@@ -1,36 +1,100 @@
 :root {
-    --primary: #b3c963;
-    --primary-dark: #383838;
-    --sent-message-bg:#8daa60;
+    /*==============================
+    =            THEME             =
+    ==============================*/
+    
+    /* Palette */
+    --primary-hue: 80;
+    --primary-saturation: 38%;
+    --primary-lightness: 58%;
+    
+    --primary: hsl(var(--primary-hue), var(--primary-saturation), var(--primary-lightness));
+    --primary-dark: hsl(var(--primary-hue), 25%, 30%);
+    --sent-message-bg: hsl(var(--primary-hue), 28%, 52%);
+    
+    /* Grayscale */
     --bg-dark: #121212;
     --bg-card: #1e1e1e;
     --bg-surface: #2d2d2d;
     --text-primary: #e0e0e0;
     --text-secondary: #999;
     --divider: #00000051;
-    --header-height: 60px;
-
-    /* text highlight colors */
-    --keyword: #d3a67a;
-    --name: #adcd84;
-    --condition: #a9a8e5;
-
-    --rarity-common: #b4b4b4;
-    --rarity-uncommon: #5ee17f;
-    --rarity-rare: #4985c1;
-    --rarity-very-rare: #984ccb;
-    --rarity-legendary: #db8835;
-    --rarity-artifact: #e6cc80;
-    --rarity-unique: #8d2525;
-
-    --damage: #d6533c;
-    --heal: #aae062;
     
-}
-@import url(
-    'https://fonts.googleapis.com/css?family=Roboto&display=swap'
-    );
+    /* Layout */
+    --header-height: 60px;
+    
+    /*==============================
+    =     TEXT HIGHLIGHTING        =
+    ==============================*/
+    
+    /* Base Highlight Styles */
+    --highlight-padding: 4px;
+    --highlight-border-radius: 5px;
+    
+    /* Highlight Colors */
+    --color-keyword: #d3a67a;
+    --color-name: #adcd84;
+    --color-condition: #a9a8e5;
+    --color-damage: #d6533c;
+    --color-heal: #aae062;
+    
+    /* Background Tints */
+    --bg-tint-keyword: color-mix(in srgb, var(--color-keyword) 10%, transparent);
+    --bg-tint-condition: color-mix(in srgb, var(--color-condition) 10%, transparent);
+    --bg-tint-damage: color-mix(in srgb, var(--color-damage) 10%, transparent);
+    --bg-tint-heal: color-mix(in srgb, var(--color-heal) 10%, transparent);
+    
+    /*==============================
+    =      PLAYER COLORS           =
+    ==============================*/
+    
+    /* --- Palette 1 --- */
+    --player-color-1: #A8D8B9; /* Seafoam Green */
+    --player-color-1-bg: #A8D8B94D;
+    /* --- Palette 2 --- */
+    --player-color-2: #F3B29A; /* Muted Coral */
+    --player-color-2-bg: #F3B29A4D;
+    /* --- Palette 3 --- */
+    --player-color-3: #A4BBEA; /* Periwinkle Blue */
+    --player-color-3-bg: #A4BBEA4D;
+    /* --- Palette 4 --- */
+    --player-color-4: #F5D67A; /* Soft Gold */
+    --player-color-4-bg: #F5D67A4D;
+    /* --- Palette 5 --- */
+    --player-color-5: #C4A9D7; /* Lavender */
+    --player-color-5-bg: #C4A9D74D;
+    /* --- Palette 6 --- */
+    --player-color-6: #F0A975; /* Apricot */
+    --player-color-6-bg: #F0A9754D;
+    /* --- Palette 7 --- */
+    --player-color-7: #87CEEB; /* Sky Blue */
+    --player-color-7-bg: #87CEEB4D;
+    /* --- Palette 8 --- */
+    --player-color-8: #F28CAF; /* Soft Pink */
+    --player-color-8-bg: #F28CAF4D;
+    
+    
+    /*==============================
+    =       ITEM RARITY            =
+    ==============================*/
+    
+    --rarity-common: #B0BEC5;    /* Blue Grey */
+    --rarity-uncommon: #A5D6A7;  /* Soft Green */
+    --rarity-rare: #90CAF9;      /* Soft Blue */
+    --rarity-very-rare: #CE93D8; /* Soft Purple */
+    --rarity-legendary: #FFCC80; /* Soft Orange */
+    --rarity-artifact: #FFF59D;  /* Soft Yellow */
+    --rarity-unique: #EF9A9A;    /* Soft Red */
 
+
+    /*==============================
+    =      ACTIVE PLAYER THEME     =
+    ==============================*/
+    --active-player-color: var(--primary);
+    --active-player-color-bg: var(--primary-dark);
+}
+
+@import url('https://fonts.googleapis.com/css?family=Roboto&display=swap');
 
 * {
     box-sizing: border-box;
@@ -39,36 +103,41 @@
     font-size: 20px;
     padding: 0;
 }
-.keyword{
-    color: var(--keyword);
+
+/*==============================
+=     HIGHLIGHTING CLASSES     =
+==============================*/
+
+.keyword {
+    color: var(--color-keyword);
     font-style: italic;
 }
-.name{
-    color: var(--name);
+
+.name {
+    color: var(--color-name);
 }
-.condition{
-    color: var(--condition);
-    background-color: color-mix(in srgb, var(--condition) 10%, transparent);
-    padding-left: 4px;
-    padding-right: 4px;
-    border-radius: 5px;
+
+.condition {
+    color: var(--color-condition);
+    background-color: var(--bg-tint-condition);
+    padding: var(--highlight-padding);
+    border-radius: var(--highlight-border-radius);
 }
 
 .damage {
-  color: var(--damage);
-  background-color: color-mix(in srgb, var(--damage) 10%, transparent);
-  padding-left: 4px;
-  padding-right: 4px;
-  border-radius: 5px;
+    color: var(--color-damage);
+    background-color: var(--bg-tint-damage);
+    padding: var(--highlight-padding);
+    border-radius: var(--highlight-border-radius);
 }
 
 .heal {
-    color: var(--heal);
-    background-color: color-mix(in srgb, var(--heal) 10%, transparent);
-    padding-left: 4px;
-    padding-right: 4px;
-    border-radius: 5px;
+    color: var(--color-heal);
+    background-color: var(--bg-tint-heal);
+    padding: var(--highlight-padding);
+    border-radius: var(--highlight-border-radius);
 }
+
 
 
 body {
@@ -342,17 +411,24 @@ select:focus {
 .chat-header {
     padding: 16px;
     background-color: var(--bg-card);
-    color: var(--primary);
     font-size: 1.2em;
     font-weight: 500;
     display: flex;
     align-items: center;
     border-bottom: 1px solid var(--divider);
     position: relative; /* Добавляем для правильного позиционирования */
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+#character_name {
+    color: var(--active-player-color);
+    transition: color 0.3s ease;
 }
 
 .chat-header .material-icons {
     margin-right: 12px;
+    color: var(--active-player-color);
+    transition: color 0.3s ease;
 }
 
 .chat-messages {
@@ -383,18 +459,26 @@ select:focus {
     color: var(--text-secondary);
 }
 
-.received {
-    align-self: flex-start;
-    background-color: var(--bg-surface);
-    color: var(--text-primary);
-    border-top-left-radius: 4px;
-}
-
 .sent {
     align-self: flex-end;
-    background-color: var(--sent-message-bg);
-    color: white;
-    border-top-right-radius: 4px;
+}
+
+.received {
+    align-self: flex-start;
+}
+
+.player-message {
+    border: 1px solid var(--player-color, var(--text-secondary));
+    background-color: var(--player-color-bg, var(--bg-surface));
+    color: var(--text-primary);
+    border-radius: 8px;
+    padding: 2px;
+    transition: box-shadow 0.3s ease;
+    box-shadow: 0 0 20px -5px var(--player-color, transparent); /* Initial subtle glow */
+}
+
+.player-message:hover {
+    box-shadow: 0 0 30px 0px var(--player-color, var(--text-secondary)); /* More intense on hover */
 }
 
 .sender-name {
@@ -404,11 +488,16 @@ select:focus {
     margin: 5px;
     margin-bottom: 10px;
     color: var(--primary);
-    background-color: var(--primary-dark);
+    background-color: color-mix(in srgb, var(--primary) 20%, transparent);
     padding: 4px;
     padding-left: 15px;
     padding-right: 15px;
     border-radius: 5px;
+}
+
+.player-message .sender-name {
+    color: var(--player-color, var(--primary));
+    background-color: var(--player-color-bg, var(--primary-dark));
 }
 
 
@@ -468,12 +557,19 @@ select:focus {
 #message-input {
     flex: 1;
     padding: 12px 16px;
-    border: none;
+    border: 2px solid transparent;
     border-radius: 24px;
     outline: none;
     background-color: var(--bg-surface);
     color: var(--text-primary);
     font-size: 1em;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    box-shadow: 0 0 20px -5px var(--active-player-color); /* Initial subtle glow */
+}
+
+#message-input:focus {
+    border-color: var(--active-player-color);
+    box-shadow: 0 0 30px 0px var(--active-player-color); /* More intense on focus */
 }
 
 #message-input::placeholder {
@@ -483,19 +579,21 @@ select:focus {
 #send-button {
     margin-left: 12px;
     padding: 10px;
-    background-color: var(--primary);
-    color: white;
+    background-color: var(--active-player-color);
+    color: var(--bg-surface);
     border: none;
     border-radius: 50%;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: background-color 0.2s;
+    transition: background-color 0.2s, box-shadow 0.3s ease;
+    box-shadow: 0 0 15px -2px var(--active-player-color); /* Initial subtle glow */
 }
 
 #send-button:hover {
-    background-color: var(--primary-dark);
+    background-color: var(--active-player-color-bg);
+    box-shadow: 0 0 25px 5px var(--active-player-color); /* More intense on hover */
 }
 
 /* --- INACTIVE STYLES --- */
@@ -538,12 +636,13 @@ select:focus {
 }
 
 ::-webkit-scrollbar-thumb {
-    background: var(--primary);
+    background: var(--bg-surface);
     border-radius: 4px;
+    transition: background-color 0.3s ease;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: var(--primary-dark);
+    background: var(--divider);
 }
 
 /* Медиа-запросы */
@@ -956,7 +1055,7 @@ select:focus {
     margin-right: 10px;
  --uib-size: 42px;
  --uib-speed: 1.25s;
- --uib-color: var(--primary-dark);
+ --uib-color: var(--active-player-color);
  position: relative;
  height: var(--uib-size);
  width: var(--uib-size);
