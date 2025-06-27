@@ -28,17 +28,17 @@ class Game:
         self.listeners = []
         self.listener_names = [] # character names
         self.generator = ObjectGenerator()
-        self.context = "Чаща леса. Полночь"
+        self.context = "Врата проклятой крепости"
         self.chapter = ChapterLogicFight(
             context = self.context,
             characters = [
-                self.generator.generate(Character, "Энт с HP по 30, урон корнями и виноградными плетями. (NPC)", self.context, "Russian"),
+                self.generator.generate(Character, "Призрак доспеха из слизи HP 30,  (NPC)", self.context, "Russian"),
                 # self.generator.generate(Character, "Призрак (какой-нибудь) с HP по 30, урон корнями и виноградными плетями. (NPC)", self.context, "Russian"),
                 # self.generator.generate(Character, "странник из света (CR 1, кастует простые иллюзии, ослепление) ➤ Угрозы умеренные, но запоминающиеся. (enemy NPC)", self.context, "Russian"),
                 # self.generator.generate(Character, "Яша Лава - ЛАвовый голем with full hp (10 hp) random inventory (non-player character)", self.context, "Russian"),
                 # self.generator.generate(Character, "Яша Лужа - Водяной голем with full hp (50 hp) random inventory (non-player character)", self.context, "Russian"),
-                self.generator.generate(Character, "Игорь - боевой дворф with full hp (50 hp) random inventory (player character)", self.context, "Russian"),
-                self.generator.generate(Character, "Олег - маг с кучей заклинаний with full hp (50 hp) random inventory (player character)", self.context, "Russian"),
+                self.generator.generate(Character, "Ли Хуй С Ним - оживший шкафчик в котором спавнится рандомный предмет из средств личной гигиены который может взрываться. Оружие - дверца и шуфлятка with full hp (20 hp) random inventory (player character)", self.context, "Russian"),
+                self.generator.generate(Character, "Горло - маг с кучей темных заклинаний with full hp (20 hp) random inventory (player character)", self.context, "Russian"),
             ]
         )
         self.chapter.game_mode = GameMode.NARRATIVE

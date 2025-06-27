@@ -16,6 +16,10 @@ class Prompter:
         # The core prompt logic remains identical. The only change is how
         # the context is sourced below.
         return f"""
+<SYSTEM>
+{global_defines.dungeon_master_core_prompt}
+</SYSTEM>
+
 <ROLE>
 Ты — Повествовательный Режиссёр (Narrative Director). Твоя задача — сделать мир живым и отзывчивым. Проанализировав действие игрока, ты должен определить, как на него отреагируют NPC и изменится ли мир или сюжет. Ты НЕ описываешь это игроку, а создаешь структурированные инструкции для игрового движка.
 </ROLE>
@@ -61,6 +65,10 @@ class Prompter:
     def get_action_prompt(self, chapter: 'ChapterLogicFight', character: Character, action_text: str, is_NPC: bool = False) -> str:
 
         return f"""
+<SYSTEM>
+You are a Dungeon Master's assistant. Your primary role is to interpret player actions, determine their outcomes based on the provided context and rules, and describe those outcomes in a compelling narrative format. You must also provide structured data that the game engine can use to update the game state.
+</SYSTEM>
+
 <ROLE>
 {global_defines.dungeon_master_core_prompt}
 </ROLE>
@@ -118,7 +126,7 @@ class Prompter:
 </RULES>
 
 <OUTPUT_FORMAT>
-Твой ответ ДОЛЖЕН быть ОДНИМ JSON-объектом, БЕЗ каких-либо дополнительных пояснений или текста до/после него. JSON должен строго соответствовать Pydantic-модели `ActionOutcome`.
+Твой ответ ДОЛЖЕН быть ОДНИМ JSON-объектом, БЕЗ каких-либо дополнительных пояснений ��ли текста до/после него. JSON должен строго соответствовать Pydantic-модели `ActionOutcome`.
 -   `narrative_description`: Красочное описание для игрока. **ОБЯЗАТЕЛЬНО** используй эти HTML-теги:
     -   `<span class="name">Имя</span>` для имен и названий.
     -   `<span class="damage">описание урона</span>` для любого вреда.
@@ -126,9 +134,14 @@ class Prompter:
     -   `<span class="condition">описание состояния</span>` для наложения эффектов.
 -   `structural_changes`: Список объектов, описывающих конкретные изменения. Также используй теги. Обязательно указывай числа и результаты бросков, а не сами броски. Если изменений нет, оставь пустым `[]`.
 -   `is_legal`: `true` или `false`.
-Important: if for example a character took their sword and left it in the middle of the road it should be a change for the character and a change for the scene as well.
-Example: if a character lightens up a bonfire you should come up with something like "Light up a bonfire" - where object type is scene.
-Example: if a character uses a potion it should be removed from their inventory.
+
+**Примеры:**
+- **Действие:** "Я атакую гоблина своим мечом."
+  - **Результат:** `narrative_description` содержит бросок атаки, урон. `structural_changes` содержит изменение `current_hp` гоблина.
+- **Действие:** "Я пью зелье лечения."
+  - **Результат:** `narrative_description` описывает, как персонаж пьет зелье и чувствует себя лучше. `structural_changes` содержит изменение `current_hp` персонажа и удаление зелья из инвентаря.
+- **Действие:** "Я пытаюсь убедить стражника пропустить меня."
+  - **Результат:** `narrative_description` содержит проверку навыка Убеждения и реакцию стражника. `structural_changes` может быть пустым, если стражник не меняет своего мнения.
 </OUTPUT_FORMAT>
 
 <CONTEXT>
@@ -148,6 +161,10 @@ Example: if a character uses a potion it should be removed from their inventory.
         if the game state should switch between COMBAT and NARRATIVE modes.
         """
         return f"""
+<SYSTEM>
+{global_defines.dungeon_master_core_prompt}
+</SYSTEM>
+
 <ROLE>
 Ты — Режиссёр Игры (Game Director). Твоя задача — не описывать события, а анализировать игровой процесс на мета-уровне. Ты должен определить, в каком режиме должна продолжаться игра: в пошаговом бою (`COMBAT`) или в свободном повествовании (`NARRATIVE`).
 </ROLE>
@@ -157,7 +174,7 @@ Example: if a character uses a potion it should be removed from their inventory.
 </GOAL>
 
 <DEFINITIONS>
-- **`COMBAT` (Боевой режим):** Структурированный, пошаговый режим. Используется, когда начались активные боевые действия. Время течет дискретно (раунд за раундом). Персонажи совершают действия по очереди.
+- **`COMBAT` (Боевой режим):** Структурированный, пошаговый режим. Используется, когда начались активные боевы�� действия. Время течет дискретно (раунд за раундом). Персонажи совершают действия по очереди.
 - **`NARRATIVE` (Повествовательный режим):** Свободный режим. Используется для диалогов, исследований, путешествий и решения головоломок. Время течет плавно, и персонажи могут действовать свободно, без строгой очередности.
 </DEFINITIONS>
 
@@ -183,7 +200,7 @@ Example: if a character uses a potion it should be removed from their inventory.
 <OUTPUT_FORMAT>
 Твой ответ ДОЛЖЕН быть ОДНИМ JSON-объектом, БЕЗ каких-либо дополнительных пояснений или текста до/после него. JSON должен строго соответствовать Pydantic-модели `TurnAnalysisOutcome`.
 -   `recommended_mode`: `COMBAT` или `NARRATIVE`.
--   `analysis_summary`: Краткое и чёткое объяснение твоего выбора на русском языке. Почему ты рекомендуешь именно этот режим?
+-   `analysis_summary`: Краткое и чёткое объяснение твоего выбора на русском языке. Почему ты рекомендуеш�� именно этот режим?
 </OUTPUT_FORMAT>
 
 <CONTEXT>

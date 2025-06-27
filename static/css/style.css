@@ -473,12 +473,13 @@ select:focus {
     color: var(--text-primary);
     border-radius: 8px;
     padding: 2px;
+    z-index: 999;
     transition: box-shadow 0.3s ease;
-    box-shadow: 0 0 20px -5px var(--player-color, transparent); /* Initial subtle glow */
+    box-shadow: 0 0 700px -5px color-mix(in srgb, var(--player-color, var(--primary-dark)) 20%, transparent) /* Initial subtle glow */
 }
 
 .player-message:hover {
-    box-shadow: 0 0 30px 0px var(--player-color, var(--text-secondary)); /* More intense on hover */
+    box-shadow: 0 0 300px -5px color-mix(in srgb, var(--player-color, var(--primary-dark)) 40%, transparent) /* More intense on hover */
 }
 
 .sender-name {
@@ -564,12 +565,13 @@ select:focus {
     color: var(--text-primary);
     font-size: 1em;
     transition: border-color 0.3s ease, box-shadow 0.3s ease;
-    box-shadow: 0 0 20px -5px var(--active-player-color); /* Initial subtle glow */
+    /* box-shadow: 0 0 20px -5px var(--active-player-color); */
+    box-shadow: 0 0 200px -5px color-mix(in srgb, var(--active-player-color) 20%, transparent)
 }
 
 #message-input:focus {
     border-color: var(--active-player-color);
-    box-shadow: 0 0 30px 0px var(--active-player-color); /* More intense on focus */
+    box-shadow: 0 0 500px -5px color-mix(in srgb, var(--active-player-color) 80%, transparent)
 }
 
 #message-input::placeholder {
@@ -579,7 +581,7 @@ select:focus {
 #send-button {
     margin-left: 12px;
     padding: 10px;
-    background-color: var(--active-player-color);
+    background-color: var(--active-player-color-bg);
     color: var(--bg-surface);
     border: none;
     border-radius: 50%;
@@ -588,12 +590,12 @@ select:focus {
     align-items: center;
     justify-content: center;
     transition: background-color 0.2s, box-shadow 0.3s ease;
-    box-shadow: 0 0 15px -2px var(--active-player-color); /* Initial subtle glow */
+    box-shadow: 0 0 200px -5px color-mix(in srgb, var(--active-player-color) 20%, transparent)
 }
 
 #send-button:hover {
-    background-color: var(--active-player-color-bg);
-    box-shadow: 0 0 25px 5px var(--active-player-color); /* More intense on hover */
+    background-color: var(--active-player-color);
+    box-shadow: 0 0 300px -5px color-mix(in srgb, var(--active-player-color) 100%, transparent)
 }
 
 /* --- INACTIVE STYLES --- */

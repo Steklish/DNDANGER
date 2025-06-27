@@ -129,7 +129,15 @@
         <!-- Область ввода сообщений -->
         <div class="chat-input-container">
             <div class="chat-input">
-                <input type="text" id="message-input" placeholder="Type a message..." autofocus autocomplete="new_password">
+                <input 
+                    type="text" 
+                    id="message-input" 
+                    placeholder="Type a message..." 
+                    autofocus 
+                    autocomplete="off"
+                    readonly 
+                    onfocus="this.removeAttribute('readonly');"
+                >
                 <div id="player_wait_loading">
                     <div class="jelly-triangle">
                     <div class="jelly-triangle__dot"></div>

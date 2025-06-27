@@ -174,14 +174,21 @@ document.addEventListener('DOMContentLoaded', function() {
     const PLAYER_COLORS = 8; // Number of player colors defined in CSS
 
     function simpleHashCode(str) {
-        let hash = 0;
-        for (let i = 0; i < str.length; i++) {
-            const char = str.charCodeAt(i);
-            hash = (hash << 5) - hash + char;
-            hash |= 0; // Convert to 32bit integer
-        }
-        return Math.abs(hash);
+    let hash = 0;
+    if (str.length === 0) {
+        return hash;
     }
+    
+    for (let i = 0; i < str.length; i++) {
+        const char = str.charCodeAt(i);
+        hash = (hash << 5) - hash + char;
+        
+        // Convert to a 32bit integer
+        hash |= 0; 
+    }
+    // Ensure the result is a non-negative number.
+    return Math.abs(hash);
+}
 
     function getPlayerColor(name) {
         const hash = simpleHashCode(name);

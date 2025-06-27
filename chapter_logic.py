@@ -207,24 +207,33 @@ Your response must be ONLY the complete, updated JSON object for the character. 
             if character.name == self.get_active_character_name():
                 return character
 
-    def get_actual_context(self) -> str:
+    def get_actual_context(self, active_character_name: str = "not provided") -> str:
+        """
+        Generates a comprehensive and clearly structured JSON string representing the current game state.
+        An optional active_character_name can be provided to mark who is currently acting.
+        """
+        all_characters_data = []
+        for char in self.characters:
+            char_data = char.model_dump()
+            # Mark the active character if one is specified
+            if active_character_name and char.name == active_character_name:
+                char_data['is_currently_acting'] = True
+            else:
+                char_data['is_currently_acting'] = False
+            all_characters_data.append(char_data)
+
         context_dict = {
-            "world_state": {
+            "game_state": {
                 "summary_of_past_events": self.context,
-                "current_scene": self.scene.model_dump() if self.scene else None,
-            },
-            "participants": {
-                "all_characters": [char.model_dump() for char in self.characters]
+                "current_scene": self.scene.model_dump() if self.scene else "No scene is currently active.",
+                "participants": {
+                    "description": "A list of all characters currently in the scene.",
+                    "characters": all_characters_data
+                }
             }
         }
 
-        data =  f"""
-    <CONTEXT_DATA>
-    {json.dumps(context_dict, indent=2, ensure_ascii=False)}
-    </CONTEXT_DATA>
-    """
-        # print(data)
-        return data
+        return f"<CONTEXT_DATA>\n{json.dumps(context_dict, indent=2, ensure_ascii=False)}\n</CONTEXT_DATA>"
 
 
 
@@ -280,26 +289,44 @@ Your response must be ONLY the complete, updated JSON object for the character. 
         
     async def askedDM(self, character: Character, question: str):
         """
-        Handles a character asking the DM a question.
-        
-        :param character: The character asking the question.
-        :param question: The question being asked.
+        Handles a character asking the DM a question, ensuring the response is in the second person.
         """
         print(f"\n{ENTITY_COLOR}{character.name}{Colors.RESET} {INFO_COLOR}asks:{Colors.RESET} {question}")
+        
+        # Pass the active character's name to get the right context
+        context_with_active_char = self.get_actual_context(active_character_name=character.name)
+        
         prompt = f"""
-        {global_defines.dungeon_master_core_prompt}
-        [current task]
-        Ответь на запрос игрока, выделяя ключевые слова тегом <span class='keyword'>ключевые слова</span> и выделяя имена тегом <span class='name'>имена</span>. Сейчас ты только отвечаешь игроку, и, значит, твой ответ не должен влиятьь на мир или персонажей. 
-        [Контекст]
-        {self.get_actual_context()}
-        [Запрос] 
-        "{question}"
-        """
+<ROLE>
+You are the Dungeon Master (DM). Your primary role is to be an impartial referee and a vivid storyteller. A player is asking you a question directly. You must answer them in a helpful and direct manner.
+</ROLE>
+
+<TASK>
+1.  **Identify the Player:** In the `<CONTEXT_DATA>`, find the character where `is_currently_acting` is `true`. This is the player you are speaking to.
+2.  **Address Them Directly:** Formulate your response in the second person, as if you are speaking directly to that player. Use "you" and "your".
+3.  **Answer the Question:** Based on the full context provided, answer the player's question clearly and concisely.
+4.  **Use Highlighting:** Emphasize important keywords and names using `<span class='keyword'>keyword</span>` and `<span class='name'>Name</span>` tags.
+5.  **Do Not Affect the World:** Your response is purely informational. It should not cause any changes to the game state.
+</TASK>
+
+<EXAMPLE>
+- **Player's Question:** "What do I see in the room?"
+- **Your Response:** "You see a large, dusty room with a wooden table in the center. On the table, you notice an old <span class='keyword'>book</span> and a single <span class='name'>silver key</span>."
+</EXAMPLE>
+
+<CONTEXT_DATA>
+{context_with_active_char}
+</CONTEXT_DATA>
+
+<PLAYER_QUESTION>
+"{question}"
+</PLAYER_QUESTION>
+
+Your response:
+"""
         reply = self.classifier.general_text_llm_request(prompt)
-        self.context =  str(self.context) + f"<Chracter's interaction>{character.name} asks DM: {question}</Chracter's interaction>"
-        self.context += f"<DM's response>\n{reply}</DM's response>\n"
-        yield EventBuilder.DM_message(reply) # type: ignore
-        # return reply
+        self.context += f"<Interaction>{character.name} asks DM: {question}\nDM's response: {reply}</Interaction>\n"
+        yield EventBuilder.DM_message(reply)
 
     def trim_context(self):
         print(f"\n{DEBUG_COLOR}Context trimming...{Colors.RED} {len(self.context)} chars of context {Colors.RESET}") # type: ignore
@@ -465,7 +492,11 @@ Provide your response as a single JSON object matching the `ClassifyInformationO
         """
         Handles the npc's turn in the fight.
         """
-        print(f"\n{HEADER_COLOR}NPC's turn:{Colors.RESET}")
+        active_char = self.get_active_character()
+        print(f"\n{HEADER_COLOR}NPC's turn: {active_char.name}{Colors.RESET}")
+        
+        context_with_active_char = self.get_actual_context(active_character_name=active_char.name)
+        
         NPC_action_prompt = f"""
 <ROLE>
 Ты — искусственный интеллект, управляющий неигровым персонажем (NPC) в бою.
@@ -473,16 +504,16 @@ Provide your response as a single JSON object matching the `ClassifyInformationO
 </ROLE>
 
 <CHARACTER_PROFILE>
-{self.get_active_character().model_dump_json(indent=2)}
+{active_char.model_dump_json(indent=2)}
 </CHARACTER_PROFILE>
 
 <SITUATION_CONTEXT>
-{self.get_actual_context()}
+{context_with_active_char}
 </SITUATION_CONTEXT>
 
 <TASK>
 Проанализируй личность персонажа, его цели и текущую боевую обстановку. Выбери его следующее действие.
-Твой ответ должен быть **короткой фразой, описывающей действие**, как будто ее говорит игрок.
+Твой ответ должен быть **короткой фразой, описывающей действие**, как буд��о ее говорит игрок.
 Не пиши полную историю, только само действие.
 
 Примеры хороших ответов:
