@@ -1,248 +1,178 @@
-const adminName = localStorage.getItem('playerName');
-if (adminName?.toLowerCase() !== 'admin') {
-    window.location.href = '/login.html';
-}
+document.addEventListener('DOMContentLoaded', () => {
+    fetchGameState();
+});
 
-let currentTurnIndex = 0;
-let initiativeOrder = [];
-// Добавим объект для хранения состояния вкладок
-let activeTabStates = {};
-
-// Создаем EventSource для получения обновлений
-const eventSource = new EventSource("/stream");
-
-// Обрабатываем получаемые сообщения
-eventSource.onmessage = function(event) {
+async function fetchGameState() {
     try {
-        const data = JSON.parse(event.data);
-        if (data.scene) {
-            updateScene(data.scene);
-        }
-        if (data.characters) {
-            updateCharacters(data.characters);
-            if (initiativeOrder.length === 0) {
-                updateTurnOrder(data.characters);
-            }
-        }
+        const response = await fetch('/api/game_state');
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        const state = await response.json();
+        updateUI(state);
     } catch (error) {
-        console.error('Update error:', error);
-    }
-};
-
-// Обработка ошибок подключения
-eventSource.onerror = function(error) {
-    console.error("EventSource failed:", error);
-    eventSource.close();
-    // Попытка переподключения через 5 секунд
-    setTimeout(() => {
-        window.location.reload();
-    }, 5000);
-};
-
-// Первоначальная загрузка данных
-async function fetchUpdates() {
-    try {
-        const response = await fetch('/refresh');
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const data = await response.json();
-        updateScene(data.scene);
-        updateCharacters(data.characters);
-        if (initiativeOrder.length === 0) {
-            updateTurnOrder(data.characters);
-        }
-    } catch (error) {
-        console.error('Fetch error:', error);
+        console.error('Failed to fetch game state:', error);
     }
 }
 
-// Загружаем начальные данные
-fetchUpdates();
+function updateUI(state) {
+    // Game Mode, Story, Scene, Debug info... (remains the same)
+    document.getElementById('game-mode-indicator').textContent = `Game Mode: ${state.game_mode}`;
+    const story = state.story;
+    document.getElementById('story-title').textContent = story.title;
+    document.getElementById('story-goal').textContent = story.main_goal;
+    if (story.current_plot_point) {
+        document.getElementById('plot-point-desc').textContent = story.current_plot_point.description;
+        document.getElementById('plot-point-conditions').textContent = `Completion: ${story.current_plot_point.completion_conditions}`;
+    }
+    const selector = document.getElementById('plot-point-selector');
+    selector.innerHTML = story.all_plot_points.map(p => 
+        `<option value="${p.id}" ${p.id === story.current_plot_point?.id ? 'selected' : ''}>${p.title}</option>`
+    ).join('');
+    document.getElementById('scene-name').textContent = state.scene.name;
+    document.getElementById('scene-description').innerHTML = marked.parse(state.scene.description);
+    document.getElementById('scene-objects-list').innerHTML = state.scene.objects.map(obj => `
+        <div class="scene-object"><strong>${obj.name}</strong>: ${obj.description}</div>
+    `).join('');
+    document.getElementById('game-context').textContent = state.context || "No context available.";
+    const chatHistory = document.getElementById('chat-history');
+    chatHistory.innerHTML = state.chat_history.map(msg => `
+        <div class="chat-message"><strong>${msg.sender_name}:</strong> ${msg.message_text}</div>
+    `).join('');
+    chatHistory.scrollTop = chatHistory.scrollHeight;
 
-function updateScene(scene) {
-    if (!scene) return;
-
-    document.getElementById('sceneName').textContent = scene.name;
-    document.getElementById('sceneDescription').innerHTML = marked.parse(scene.description);
-
-    const objectsContainer = document.getElementById('sceneObjects');
-    objectsContainer.innerHTML = scene.objects.map(obj => `
-        <div class="scene-object">
-            <h4>${obj.name}</h4>
-            <p>${obj.description}</p>
-            <p><small>${obj.position_in_scene}</small></p>
+    // Event Log
+    const eventLog = document.getElementById('event-log');
+    eventLog.innerHTML = state.event_log.map(log => `
+        <div class="log-entry">
+            <strong>${log.event}</strong>
+            <pre>${JSON.stringify(log.details, null, 2)}</pre>
         </div>
     `).join('');
-}
+    eventLog.scrollTop = eventLog.scrollHeight;
 
-// Функция для создания безопасного ID
-function makeValidId(str) {
-    return str.toLowerCase().replace(/[^a-z0-9]/g, '_');
-}
 
-function updateCharacters(characters) {
-    if (!characters?.length) return;
-
-    // Сохраняем текущие активные вкладки перед обновлением
-    const cards = document.querySelectorAll('.character-card');
-    cards.forEach(card => {
-        const charName = card.querySelector('h3').textContent;
-        const charId = makeValidId(charName);
-        const activeTab = card.querySelector('.tab-btn.active');
-        if (activeTab) {
-            const tabIndex = Array.from(card.querySelectorAll('.tab-btn')).indexOf(activeTab);
-            activeTabStates[charId] = ['abilities', 'inventory', 'background'][tabIndex];
-        }
+    // Enhanced Character Roster
+    const roster = document.getElementById('character-roster');
+    roster.innerHTML = state.characters.map(char => createCharacterCard(char)).join('');
+    
+    // Add event listeners for the new edit buttons
+    document.querySelectorAll('.toggle-edit-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const form = document.getElementById(`edit-form-${btn.dataset.charId}`);
+            form.style.display = form.style.display === 'none' ? 'block' : 'none';
+        });
     });
+}
 
-    const panel = document.getElementById('charactersPanel');
-    panel.innerHTML = characters.map(char => {
-        const charId = makeValidId(char.name);
-        const activeTab = activeTabStates[charId] || 'abilities'; // По умолчанию abilities
-
-        return `
-            <div class="character-card">
-                <div class="char-header">
-                    <h3>${char.name}</h3>
-                    <span class="char-type">${char.is_player ? 'Player' : 'NPC'}</span>
-                </div>
-
-                <div class="hp-bar">
-                    <div class="hp-bar-inner" style="width: ${(char.current_hp / char.max_hp) * 100}%"></div>
-                </div>
-                <div class="stats-row">
-                    <span class="stat-item">HP: ${char.current_hp}/${char.max_hp}</span>
-                    <span class="stat-item">AC: ${char.ac}</span>
-                </div>
-
-                ${char.conditions.length ? `
-                    <div class="stats-row">
-                        <span class="stat-item conditions">${char.conditions.join(', ')}</span>
-                    </div>
-                ` : ''}
-
-                <div class="char-tabs">
-                    <button class="tab-btn ${activeTab === 'abilities' ? 'active' : ''}" 
-                            onclick="showTab('${charId}', 'abilities')">Abilities</button>
-                    <button class="tab-btn ${activeTab === 'inventory' ? 'active' : ''}" 
-                            onclick="showTab('${charId}', 'inventory')">Inventory</button>
-                    <button class="tab-btn ${activeTab === 'background' ? 'active' : ''}" 
-                            onclick="showTab('${charId}', 'background')">Background</button>
-                </div>
-
-                <div id="${charId}_abilities" class="tab-content abilities-list" 
-                     style="display: ${activeTab === 'abilities' ? 'block' : 'none'}">
-                    <h4>Abilities</h4>
-                    ${char.abilities.map(ability => `
-                        <div class="ability-item">
-                            <div class="ability-header">
-                                <strong>${ability.name}</strong>
-                            </div>
-                            <p>${ability.description}</p>
-                            ${ability.details ? `
-                                <div class="ability-details">
-                                    <em>Details:</em> ${JSON.stringify(ability.details)}
-                                </div>
-                            ` : ''}
-                        </div>
-                    `).join('')}
-                </div>
-
-                <div id="${charId}_inventory" class="tab-content inventory-list" 
-                     style="display: ${activeTab === 'inventory' ? 'block' : 'none'}">
-                    <h4>Inventory</h4>
-                    ${char.inventory.map(item => `
-                        <div class="inventory-item">
-                            <div class="item-header">
-                                <strong class="name rarity-${item.rarity || 'Common'}">${item.name}</strong>
-                                <span class="item-type">${item.item_type}</span>
-                                ${item.rarity ? `<span class="rarity-${item.rarity}">(${item.rarity})</span>` : ''}
-                            </div>
-                            <p>${item.description}</p>
-                            <div class="item-details">
-                                ${item.quantity ? `<span class="item-stat">Quantity: ${item.quantity}</span>` : ''}
-                                ${item.weight ? `<span class="item-stat">Weight: ${item.weight}</span>` : ''}
-                                ${item.value ? `<span class="item-stat">Value: ${item.value}</span>` : ''}
-                                ${item.rarity ? `<span class="item-stat">Rarity: ${item.rarity}</span>` : ''}
-                                ${item.is_magical !== undefined ? `<span class="item-stat">Magical: ${item.is_magical ? 'Yes' : 'No'}</span>` : ''}
-                                ${item.damage ? `<span class="item-stat">Damage: ${item.damage} (${item.damage_type})</span>` : ''}
-                                ${item.armor_class ? `<span class="item-stat">AC: ${item.armor_class}</span>` : ''}
-                            </div>
-                            ${item.effect ? `<p class="item-effect">${item.effect}</p>` : ''}
-                            ${item.properties?.length ? `
-                                <div class="item-properties">
-                                    <em>Properties:</em> ${item.properties.join(', ')}
-                                </div>
-                            ` : ''}
-                        </div>
-                    `).join('')}
-                </div>
-
-                <div id="${charId}_background" class="tab-content background-info" 
-                     style="display: ${activeTab === 'background' ? 'block' : 'none'}">
-                    <h4>Background & Personality</h4>
-                    <p>${char.personality_history || 'No background information available.'}</p>
-                </div>
+function createCharacterCard(char) {
+    const charId = char.name.replace(/\s+/g, '-').toLowerCase();
+    return `
+        <div class="character-card-admin" id="char-card-${charId}">
+            <div class="char-header">
+                <h3>${char.name}</h3>
+                <span class="char-type">${char.is_player ? 'Player' : 'NPC'}</span>
+                <button class="btn-small toggle-edit-btn" data-char-id="${charId}">Edit</button>
             </div>
-        `;
-    }).join('');
-}
+            <div class="hp-bar">
+                <div class="hp-bar-inner" style="width: ${(char.current_hp / char.max_hp) * 100}%"></div>
+                <span class="hp-text">${char.current_hp}/${char.max_hp} HP</span>
+            </div>
+            
+            <form id="edit-form-${charId}" class="edit-character-form" style="display:none;" onsubmit="saveCharacter(event, '${char.name}')">
+                <h4>Edit ${char.name}</h4>
+                
+                <div class="form-section">
+                    <label>HP:</label>
+                    <input type="number" name="current_hp" value="${char.current_hp}"> / <input type="number" name="max_hp" value="${char.max_hp}">
+                </div>
+                
+                <div class="form-section">
+                    <label>Abilities (one per line):</label>
+                    <textarea name="abilities" rows="4">${char.abilities.map(a => a.name + ': ' + a.description).join('\n')}</textarea>
+                </div>
 
-function showTab(charId, tabName) {
-    const card = document.querySelector(`.character-card:has(#${charId}_${tabName})`);
-    if (!card) return;
-    
-    // Деактивируем все кнопки
-    card.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.classList.remove('active');
-    });
-    
-    // Скрываем все вкладки
-    card.querySelectorAll('.tab-content').forEach(tab => {
-        tab.style.display = 'none';
-    });
-    
-    // Активируем нужную вкладку и кнопку
-    const targetTab = document.getElementById(`${charId}_${tabName}`);
-    const targetBtn = card.querySelector(`.tab-btn:nth-child(${['abilities', 'inventory', 'background'].indexOf(tabName) + 1})`);
-    
-    if (targetTab) targetTab.style.display = 'block';
-    if (targetBtn) targetBtn.classList.add('active');
-
-    // Сохраняем состояние
-    activeTabStates[charId] = tabName;
-}
-
-function updateTurnOrder(characters) {
-    if (!characters?.length) return;
-
-    if (initiativeOrder.length === 0) {
-        initiativeOrder = characters
-            .map(char => ({
-                name: char.name,
-                isPlayer: char.is_player,
-                initiative: Math.floor(Math.random() * 20) + 1
-            }))
-            .sort((a, b) => b.initiative - a.initiative);
-    }
-
-    const list = document.getElementById('turnOrderList');
-    list.innerHTML = initiativeOrder.map((char, index) => `
-        <div class="turn-item ${index === currentTurnIndex ? 'active' : ''}">
-            <span>${char.initiative}</span>
-            <span>${char.name}</span>
+                <div class="form-section">
+                    <label>Inventory (one per line):</label>
+                    <textarea name="inventory" rows="4">${char.inventory.map(i => i.name).join('\n')}</textarea>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="submit" class="btn-small">Save</button>
+                    <button type="button" class="btn-small btn-danger" onclick="deleteCharacter('${char.name}')">Delete</button>
+                </div>
+            </form>
         </div>
-    `).join('');
+    `;
 }
 
-function nextTurn() {
-    if (initiativeOrder.length === 0) return;
-    currentTurnIndex = (currentTurnIndex + 1) % initiativeOrder.length;
-    updateTurnOrder([]);
+async function saveCharacter(event, characterName) {
+    event.preventDefault();
+    const form = event.target;
+    const formData = new FormData(form);
+    
+    const abilitiesText = formData.get('abilities').split('\n').filter(line => line.trim() !== '');
+    const inventoryText = formData.get('inventory').split('\n').filter(line => line.trim() !== '');
+
+    const payload = {
+        name: characterName,
+        updates: {
+            current_hp: parseInt(formData.get('current_hp')),
+            max_hp: parseInt(formData.get('max_hp')),
+            abilities: abilitiesText.map(line => {
+                const [name, ...desc] = line.split(':');
+                return { name: name.trim(), description: desc.join(':').trim(), details: {} };
+            }),
+            inventory: inventoryText.map(name => ({ name: name.trim(), description: "An item." })), // Simplified for now
+        }
+    };
+
+    try {
+        const response = await fetch('/api/character/update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        if (!response.ok) throw new Error('Failed to save character');
+        fetchGameState(); // Refresh UI
+    } catch (error) {
+        console.error('Error saving character:', error);
+    }
 }
 
-function resetInitiative() {
-    initiativeOrder = [];
-    currentTurnIndex = 0;
+async function deleteCharacter(characterName) {
+    if (!confirm(`Are you sure you want to delete ${characterName}?`)) return;
+
+    try {
+        const response = await fetch(`/api/character/${characterName}`, { method: 'DELETE' });
+        if (!response.ok) throw new Error('Failed to delete character');
+        fetchGameState(); // Refresh UI
+    } catch (error) {
+        console.error('Error deleting character:', error);
+    }
+}
+
+// Story navigation functions (navigateStory, jumpToPlotPoint, setPlotPoint) remain the same
+async function navigateStory(direction) {
+    try {
+        const response = await fetch(`/api/story/${direction}`, { method: 'POST' });
+        if (!response.ok) throw new Error(`Failed to navigate story: ${response.statusText}`);
+        fetchGameState();
+    } catch (error) {
+        console.error(error);
+    }
+}
+
+function jumpToPlotPoint() {
+    const selector = document.getElementById('plot-point-selector');
+    const plotPointId = selector.value;
+    setPlotPoint(plotPointId);
+}
+
+async function setPlotPoint(plotPointId) {
+    try {
+        const response = await fetch(`/api/story/set/${plotPointId}`, { method: 'POST' });
+        if (!response.ok) throw new Error(`Failed to set plot point: ${response.statusText}`);
+        fetchGameState();
+    } catch (error) {
+        console.error(error);
+    }
 }

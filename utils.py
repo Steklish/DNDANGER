@@ -13,7 +13,7 @@ def find_closest_match(query: str, choices: list[str]) -> str:
         The best matching string from the choices list, or None if choices is empty.
     """
     if not choices:
-        return "None"
+        raise ValueError("No choices provided. (options are not close enough)")
     
     # extractOne returns a tuple: (best_match, score)
     best_match = process.extractOne(query, choices)[0]

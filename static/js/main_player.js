@@ -109,7 +109,7 @@ document.addEventListener('DOMContentLoaded', function() {
     eventSource.onclose = () => console.log("SSE connection closed");
     eventSource.onerror = function(error) {
         eventSource.close();
-        showNotification("Reconnection...")
+        showNotification("Reconnecting...")
         setTimeout(() => {
             eventSource = new EventSource(`/stream?name=${character_name}`);
         }, 3000); // 3 seconds delay before reconnecting
@@ -124,10 +124,13 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     async function get_current_character(){
-        let response = await fetch('/get_current_character')
-        let name = await response.text()
-        console.log(name)
-        return name
+        let response = await fetch('/api/get_current_character');
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        let data = await response.json();
+        console.log("Active character from API:", data.active_character);
+        return data.active_character;
     }
 
     async function lock_input(is_waiting = true) {
@@ -305,77 +308,110 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Функция обновления информации о персонаже
     function updateCharacterInfo(character) {
-        // Обновляем базовую информацию
-        const charName = document.getElementById('charName');
-        const charHP = document.getElementById('charHP');
-        const charAC = document.getElementById('charAC');
-        const conditionsList = document.getElementById('conditionsList');
+        // Helper to safely update text content
+        const setText = (id, text) => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = text || 'N/A';
+        };
 
-        if (charName) charName.textContent = character.name;
-        if (charHP) charHP.textContent = `${character.current_hp}/${character.max_hp}`;
-        if (charAC) charAC.textContent = character.ac;
+        // Basic Info
+        setText('charName', character.name);
+        setText('charHP', `${character.current_hp}/${character.max_hp}`);
+        setText('charAC', character.ac);
+        setText('charGender', character.gender);
+
+        // Conditions
+        const conditionsList = document.getElementById('conditionsList');
         if (conditionsList) {
-            conditionsList.innerHTML = character.conditions.map(condition => 
-                `<li class="condition">${condition}</li>`
-            ).join('') || 'Нет активных состояний';
+            conditionsList.innerHTML = character.conditions.map(c => `<li class="condition">${c}</li>`).join('') || '<li>None</li>';
         }
 
-        // Обновляем инвентарь
+        // Stats
+        setText('charStr', character.strength);
+        setText('charDex', character.dexterity);
+        setText('charCon', character.constitution);
+        setText('charInt', character.intelligence);
+        setText('charWis', character.wisdom);
+        setText('charCha', character.charisma);
+
+        // Appearance
+        setText('charAppearance', character.appearance);
+        setText('charClothing', character.clothing_and_cosmetics);
+
+        // Background
+        setText('personalityHistory', character.personality_history);
+
+        // Inventory
         const inventoryList = document.getElementById('inventoryList');
         if (inventoryList) {
-            inventoryList.innerHTML = character.inventory.map(item => `                <div class="inventory-item">
+            inventoryList.innerHTML = character.inventory.map(item => `
+                <div class="inventory-item">
                     <div class="item-header">
-                        <strong class="name rarity-${item.rarity || 'Common'}">${item.name}</strong>
+                        <strong class="name rarity-${item.rarity}">${item.name}</strong>
                         <span class="keyword">${item.item_type}</span>
-                        ${item.rarity ? `<span class="rarity-${item.rarity}">(${item.rarity})</span>` : ''}</div>
+                    </div>
                     <p>${item.description}</p>
                     <div class="item-details">
-                        ${item.quantity ? `<span class="item-stat">Количество: ${item.quantity}</span>` : ''}
-                        ${item.damage ? `<span class="item-stat">Урон: ${item.damage}</span>` : ''}
+                        <span class="item-stat">Qty: ${item.quantity}</span>
+                        <span class="item-stat">Value: ${item.value}g</span>
+                        <span class="item-stat">Weight: ${item.weight}lb</span>
+                        ${item.is_magical ? `<span class="item-stat magical">Magical</span>` : ''}
+                        ${item.damage ? `<span class="item-stat">Dmg: ${item.damage} ${item.damage_type || ''}</span>` : ''}
                         ${item.armor_class ? `<span class="item-stat">AC: ${item.armor_class}</span>` : ''}
-                        ${item.effect ? `<span class="item-stat">Эффект: ${item.effect}</span>` : ''}
                     </div>
+                    ${item.effect ? `<p class="item-effect"><strong>Effect:</strong> ${item.effect}</p>` : ''}
+                    ${item.properties.length > 0 ? `<p class="item-properties"><strong>Properties:</strong> ${item.properties.join(', ')}</p>` : ''}
                 </div>
-            `).join('') || 'Инвентарь пуст';
+            `).join('') || '<p>Inventory is empty.</p>';
         }
 
-        // Обновляем способности
+        // Abilities
         const abilitiesList = document.getElementById('abilitiesList');
         if (abilitiesList) {
-            abilitiesList.innerHTML = character.abilities.map(ability => `
-                <div class="ability-item">
-                    <div class="ability-header">
-                        <strong class="name">${ability.name}</strong>
+            abilitiesList.innerHTML = character.abilities.map(ability => {
+                let detailsHtml = '';
+                if (ability.details && Object.keys(ability.details).length > 0) {
+                    detailsHtml = '<div class="ability-details">';
+                    for (const [key, value] of Object.entries(ability.details)) {
+                        detailsHtml += `<p><strong>${key.replace(/_/g, ' ')}:</strong> ${value}</p>`;
+                    }
+                    detailsHtml += '</div>';
+                }
+                return `
+                    <div class="ability-item">
+                        <div class="ability-header">
+                            <strong class="name">${ability.name}</strong>
+                        </div>
+                        <p>${ability.description}</p>
+                        ${detailsHtml}
                     </div>
-                    <p>${ability.description}</p>
-                    ${ability.details ? `<div class="ability-details">${JSON.stringify(ability.details)}</div>` : ''}
-                </div>
-            `).join('') || 'Нет доступных способностей';
-        }
-
-        // Обновляем историю персонажа
-        const personalityHistory = document.getElementById('personalityHistory');
-        if (personalityHistory) {
-            personalityHistory.innerHTML = `<p>${character.personality_history || 'Нет информации о предыстории'}</p>`;
+                `;
+            }).join('') || '<p>No abilities.</p>';
         }
     }
 
     // Функция обновления информации о сцене
     function updateSceneInfo(scene) {
-        const sceneName = document.getElementById('sceneName');
-        const sceneDescription = document.getElementById('sceneDescription');
-        const sceneObjects = document.getElementById('sceneObjects');
+        const setText = (id, text) => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = text || 'N/A';
+        };
 
-        if (sceneName) sceneName.textContent = scene.name;
-        if (sceneDescription) sceneDescription.textContent = scene.description;
+        setText('sceneName', scene.name);
+        setText('sceneDescription', scene.description);
+        setText('sceneSize', scene.size_description);
+
+        const sceneObjects = document.getElementById('sceneObjects');
         if (sceneObjects) {
             sceneObjects.innerHTML = scene.objects.map(obj => `
                 <div class="scene-object">
                     <strong class="name">${obj.name}</strong>
                     <p>${obj.description}</p>
-                    <p class="keyword">Взаимодействия: ${obj.interactions.join(', ')}</p>
+                    <p><strong>Size:</strong> ${obj.size_description}</p>
+                    <p><strong>Position:</strong> ${obj.position_in_scene}</p>
+                    ${obj.interactions.length > 0 ? `<p class="keyword">Interactions: ${obj.interactions.join(', ')}</p>` : ''}
                 </div>
-            `).join('');
+            `).join('') || '<p>No objects in this scene.</p>';
         }
     }
 
@@ -384,6 +420,7 @@ document.addEventListener('DOMContentLoaded', function() {
         e.stopPropagation();
         sideMenu.classList.add('open');
         document.addEventListener('click', closeMenuOutside);
+        refresh(); // Refresh data when menu opens
     });
 
     menuClose.addEventListener('click', function() {
@@ -404,17 +441,33 @@ document.addEventListener('DOMContentLoaded', function() {
         e.stopPropagation();
     });
 
-    // Обработка кликов по пунктам меню
-    menuItems.forEach(item => {
-        const header = item.querySelector('span:not(.material-icons)').parentElement;
-        header.addEventListener('click', function(e) {
-            e.stopPropagation();
-            menuItems.forEach(otherItem => {
-                if (otherItem !== item) {
-                    otherItem.classList.remove('expanded');
+    // Обработка кликов по пунктам меню (collapsible cards)
+    const menuCardHeaders = document.querySelectorAll('.menu-item-header');
+    menuCardHeaders.forEach(header => {
+        header.addEventListener('click', function() {
+            const menuItem = this.parentElement;
+            menuItem.classList.toggle('expanded');
+        });
+    });
+
+    // Обработка переключения вкладок
+    const tabLinks = document.querySelectorAll('.tab-link');
+    const tabContents = document.querySelectorAll('.tab-content');
+
+    tabLinks.forEach(link => {
+        link.addEventListener('click', function() {
+            const tabId = this.dataset.tab;
+
+            tabLinks.forEach(link => link.classList.remove('active'));
+            this.classList.add('active');
+
+            tabContents.forEach(content => {
+                if (content.id === tabId) {
+                    content.classList.add('active');
+                } else {
+                    content.classList.remove('active');
                 }
             });
-            item.classList.toggle('expanded');
         });
     });
 
@@ -436,7 +489,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     function refresh(){
-        fetch('/refresh')
+        fetch('/api/game_state')
             .then(response => response.json())
             .then(data => {
                 updateUI(data);

@@ -1,7 +1,12 @@
 from enum import Enum
 from typing import List, Union
 from pydantic import BaseModel, Field
+from typing import List, Optional, Union
+from .game_modes import GameMode
 
+class GameModeDecision(BaseModel):
+    new_mode: GameMode = Field(description="The recommended game mode ('NARRATIVE' or 'COMBAT').")
+    reasoning: str = Field(description="A brief explanation for why the mode is being changed.")
 
 class ClassifyInformationOrActionRequest(BaseModel):
     """
@@ -47,11 +52,6 @@ class ActionOutcome(BaseModel):
     narrative_description: str = Field(description="The rich, narrative description of the action's outcome, written for the player. Must use the required HTML tags for damage, healing, etc.")
     structural_changes: List[ChangesToMake] = Field(description="A list of specific, mechanical changes to characters or the scene resulting from the action.")
     is_legal: bool = Field(description="Whether the action performed was permissible within the rules or context of the game")
-    
-class GameMode(str, Enum):
-    """Enumeration for the two primary game modes."""
-    COMBAT = "COMBAT"
-    NARRATIVE = "NARRATIVE"
 
 class TurnAnalysisOutcome(BaseModel):
     """
@@ -181,3 +181,7 @@ class TurnList(BaseModel):
         description="A brief explanation of the order of characters in the turn list. Should be based on the context provided."
     )
     
+
+class StoryProgressionCheck(BaseModel):
+    conditions_met: bool = Field(description="Set to true if the player's actions have met the completion conditions, otherwise false.")
+    reasoning: str = Field(description="A brief explanation of why the conditions were or were not met, based on the provided context.")

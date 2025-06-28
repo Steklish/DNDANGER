@@ -6,9 +6,11 @@ from dotenv import load_dotenv
 from rsa import verify
 from classifier import Classifier
 from generator import ObjectGenerator
+from models.game_modes import GameMode
 from models import *
 from prompter import Prompter
 from server_communication.events import EventBuilder
+from story_manager import StoryManager
 from utils import *
 from global_defines import *
 import global_defines
@@ -16,11 +18,11 @@ from models import *
 
 
 
-class ChapterLogicFight:
+class Chapter:
     """Fight logic for a chapter in a game, handling character interactions and actions."""
 
     
-    def __init__(self, context: str, characters: List[Character] = [], language: str = "Russian"):
+    def __init__(self, context: str, story_manager: StoryManager, characters: List[Character] = [], language: str = "Russian"):
         self.context = context
         self.last_scene = context
         self.characters = characters        
@@ -32,11 +34,45 @@ class ChapterLogicFight:
         self.current_turn = 0
         self.game_mode = GameMode.NARRATIVE
         self.prompter = Prompter()
+        self.story_manager = story_manager
+        self.event_log: List[Dict[str, Any]] = []
         self.generate_scene()
+
+    def log_event(self, event_type: str, **kwargs):
+        """Logs a game event to the event log."""
+        self.event_log.append({"event": event_type, "details": kwargs})
     
     def shuffle_turns(self):
+        prompt = f"""
+<ROLE>
+You are a D&D Turn Order Strategist. Your task is to analyze the current game situation and a list of characters to determine the most logical turn order for the upcoming round.
+</ROLE>
+
+<GOAL>
+Create a new turn order for the characters involved in the scene. The order should reflect the flow of action, character initiative, and tactical common sense.
+</GOAL>
+
+<CONTEXT>
+{self.get_actual_context()}
+</CONTEXT>
+
+<CHARACTERS_IN_SCENE>
+{json.dumps(self.turn_order)}
+</CHARACTERS_IN_SCENE>
+
+<HEURISTICS_FOR_DETERMINING_TURN_ORDER>
+1.  **Action-Reaction:** The character who was just targeted or is most immediately threatened by the last action should likely act soon. The character who just acted should typically be placed later in the new turn order.
+2.  **Initiative & Alertness:** Characters who are alert, quick, or have high initiative (represented by dexterity) should generally act before slower or less aware characters.
+3.  **Narrative Flow:** The order should make sense story-wise. If a goblin ambush was just described, the goblins should probably act first.
+4.  **Inclusion Criteria:** Only include characters who are actively participating or are present and able to participate in the scene. If a character is unconscious (`is_alive: false`) or otherwise incapacitated, they should not be in the turn list.
+</HEURISTICS_FOR_DETERMINING_TURN_ORDER>
+
+<TASK>
+Based on the context and heuristics, generate a JSON object that conforms to the `TurnList` model. The `turn_list` field should contain the names of the characters in the new logical order. The `reasoning` field should briefly explain your logic.
+</TASK>
+"""
         new_turns : TurnList = self.classifier.generate(
-            contents=str(self.context) + f"<cahracter list>{json.dumps(self.turn_order)}</cahracter list> You need to provide those names in the order that is logical to currect scene. Example: Elly attacs the Goblin -> Elly have wasted her tur attacking so the next turn is likely to be goblins tern and only after the Goblin other characters should be placed in turn order, where Elly is likely to be in the endo of the list of turns. All the characters should be placed in a new turn list. No matter if they cant take rutns or dont participate for any reason. IMPORTANT: not every character has to be in the turn list. If a player is far from the finght it should not be in the turn list. Note that if a character is not directly participating in the fight but hiding near by they should be as=lso included to the fight order. Take characters initiative into account when setting up turn order.",
+            contents=prompt,
             pydantic_model=TurnList,
         ) # type: ignore
         print(f"Raw turn shuffle result:{DEBUG_COLOR} {new_turns.turn_list}{Colors.RESET}")
@@ -56,6 +92,8 @@ class ChapterLogicFight:
         """
         print(f"\n{ENTITY_COLOR}{scene_name}{Colors.RESET} {INFO_COLOR}updates attributes with:{Colors.RESET} {changes_to_make}")
         try:
+            original_scene_json = self.scene.model_dump_json(indent=2) # type: ignore
+            self.log_event("scene_update_start", scene_name=scene_name, changes=changes_to_make, original_scene=original_scene_json)
             self.scene = self.generator.generate(
                 pydantic_model=Scene,
                 prompt=f"""
@@ -65,16 +103,17 @@ class ChapterLogicFight:
                 """,
                 language=self.language
             )
+            
+            update_log = f"<SCENE_UPDATE>\n<NAME>{scene_name}</NAME>\n<CHANGES>{changes_to_make}</CHANGES>\n<ORIGINAL_STATE>{original_scene_json}</ORIGINAL_STATE>\n<NEW_STATE>{self.scene.model_dump_json(indent=2)}</NEW_STATE>\n</SCENE_UPDATE>"
+            self.context += f"\n{update_log}\n"
+            self.log_event("scene_update_success", scene_name=scene_name, new_scene=self.scene.model_dump())
+            
             print(f"{SUCCESS_COLOR} Scene updated successfully!{Colors.RESET}")
         except Exception as e:
             print(f"{ERROR_COLOR} Error updating scene: {e}{Colors.RESET}")
+            self.log_event("scene_update_failure", scene_name=scene_name, error=str(e))
             raise e
     
-    # Assuming your Character class and other imports are defined elsewhere
-# from your_models_file import Character, Item, Ability
-# from your_colors_file import ENTITY_COLOR, INFO_COLOR, SUCCESS_COLOR, ERROR_COLOR, Colors
-# from your_utils_file import find_closest_match
-
     async def update_character(self, character_name: str, changes_to_make: str):
         """
         Updates a character's attributes based on the provided changes using a robust, rule-based LLM prompt.
@@ -91,6 +130,7 @@ class ChapterLogicFight:
             character = char_dict[target_char_name]
             # Convert the current character object to a JSON string for clean input to the LLM
             character_json = character.model_dump_json(indent=2)
+            self.log_event("character_update_start", character_name=character_name, changes=changes_to_make, original_character=character.model_dump())
 
             prompt = f"""
 <ROLE>
@@ -136,26 +176,57 @@ Your response must be ONLY the complete, updated JSON object for the character. 
                 language=self.language
             )
             self.characters.append(updated_character)
+            
+            update_log = f"<CHARACTER_UPDATE>\n<NAME>{character_name}</NAME>\n<CHANGES>{changes_to_make}</CHANGES>\n<RESULT>{updated_character.model_dump_json(indent=2)}</RESULT>\n</CHARACTER_UPDATE>"
+            self.context += f"\n{update_log}\n"
+            self.log_event("character_update_success", character_name=character_name, updated_character=updated_character.model_dump())
+            
             print(f"{SUCCESS_COLOR} Character '{updated_character.name}' updated successfully!{Colors.RESET}")
             
             # Add a clear message if the character's life status changed
             if not updated_character.is_alive and character.is_alive:
                 print(f"{ERROR_COLOR} Character {updated_character.name} has died!{Colors.RESET}")
+                self.log_event("character_death", character_name=updated_character.name)
 
         except Exception as e:
             print(f"{ERROR_COLOR} Error updating character: {e}{Colors.RESET}")
+            self.log_event("character_update_failure", character_name=character_name, error=str(e))
             # Optionally re-add the original character on any failure
             if 'character' in locals() and character not in self.characters: # type: ignore
                 self.characters.append(character) # type: ignore
             raise e
             
-    def generate_scene(self):
-        # scene context is the same one as the chapter context (context at creating the chapter)
-        scene_d = self.classifier.generate(
-            f"Generate a scene description and difficulty based on the context: {self.context}",
-            NextScene
-        )
-            
+    def generate_scene(self, scene_prompt: Optional[NextScene] = None):
+        # If this is the very first scene generation, use the story's starting info.
+        if self.scene is None:
+            current_plot = self.story_manager.get_current_plot_point()
+            if current_plot:
+                prompt = f"""
+                Generate the very first scene for our D&D campaign.
+                The campaign is titled '{self.story_manager.story.title}'.
+                The players are starting in a location called '{self.story_manager.story.starting_location}'.
+                The current objective is: '{current_plot.title} - {current_plot.description}'.
+                Based on this, create a compelling and detailed opening scene. Describe the atmosphere, the immediate surroundings, and introduce the initial situation or NPC from the campaign prompt: '{self.story_manager.story.initial_character_prompt}'.
+                The scene should be mysterious and engaging, drawing the players into the world.
+                """
+            else:
+                prompt = f"""
+                Generate the very first scene for our D&D campaign.
+                The campaign is titled '{self.story_manager.story.title}'.
+                The players are starting in a location called '{self.story_manager.story.starting_location}'.
+                The initial objective is not clear, so create a scene of arrival with an air of mystery.
+                Introduce the initial situation or NPC from the campaign prompt: '{self.story_manager.story.initial_character_prompt}'.
+                The scene should be mysterious and engaging, drawing the players into the world.
+                """
+            scene_d = self.classifier.generate(prompt, NextScene)
+        elif scene_prompt is None:
+            scene_d = self.classifier.generate(
+                f"Generate a scene description and difficulty based on the context: {self.context}",
+                NextScene
+            )
+        else:
+            scene_d = scene_prompt
+
         self.scene = self.generator.generate(
             pydantic_model=Scene,
             prompt=str(scene_d),
@@ -164,8 +235,9 @@ Your response must be ONLY the complete, updated JSON object for the character. 
         )
 
         print(f"\n{SUCCESS_COLOR}Generated Scene:{Colors.RESET} {ENTITY_COLOR}{self.scene.name}{Colors.RESET}")
-        print(f"{INFO_COLOR} DIfficulty: {scene_d.scene_difficulty}{Colors.RESET}") # type: ignore
+        print(f"{INFO_COLOR} Difficulty: {scene_d.scene_difficulty}{Colors.RESET}") # type: ignore
         print(f"{INFO_COLOR} Description:{Colors.RESET} {self.scene.description}")
+        self.log_event("scene_generated", scene_name=self.scene.name, description=self.scene.description, difficulty=scene_d.scene_difficulty) # type: ignore
 
 
     def setup_fight(self):
@@ -186,7 +258,9 @@ Your response must be ONLY the complete, updated JSON object for the character. 
             Give more attention to the script and story and less to the scene and characters details.
             IMPORTANT: Keep your response maximum {MAX_CONTEXT_LENGTH} words.
             ---
+            <Context>
             {self.get_actual_context()}
+            </Context>
         """
         )
         
@@ -207,7 +281,7 @@ Your response must be ONLY the complete, updated JSON object for the character. 
             if character.name == self.get_active_character_name():
                 return character
 
-    def get_actual_context(self, active_character_name: str = "not provided") -> str:
+    def get_actual_context(self, active_character_name = None) -> str:
         """
         Generates a comprehensive and clearly structured JSON string representing the current game state.
         An optional active_character_name can be provided to mark who is currently acting.
@@ -230,7 +304,8 @@ Your response must be ONLY the complete, updated JSON object for the character. 
                     "description": "A list of all characters currently in the scene.",
                     "characters": all_characters_data
                 }
-            }
+            },
+            "global_story_context": self.story_manager.get_current_plot_context()
         }
 
         return f"<CONTEXT_DATA>\n{json.dumps(context_dict, indent=2, ensure_ascii=False)}\n</CONTEXT_DATA>"
@@ -245,6 +320,7 @@ Your response must be ONLY the complete, updated JSON object for the character. 
         Executes an action and immediately gets both the narrative and the structured changes.
         """
         print(f"\n{ENTITY_COLOR}{character.name}{Colors.RESET} {INFO_COLOR}performs action:{Colors.RESET} {action_text}")
+        self.log_event("action_start", character_name=character.name, action_text=action_text, is_npc=is_NPC)
 
         # Use a generator that can directly output a Pydantic object
         # лол
@@ -257,34 +333,36 @@ Your response must be ONLY the complete, updated JSON object for the character. 
 
         narrative = outcome.narrative_description
         changes = outcome.structural_changes
+        self.log_event("action_outcome", character_name=character.name, narrative=narrative, changes=changes, is_legal=outcome.is_legal)
 
-        # The rest of the logic
-        self.context += f"\n\n{character.name} tries to perform action {action_text}\n" # type: ignore
+        # The rest of the a
+        action_summary = f"Action by {character.name}: '{action_text}'. Outcome: {narrative}"
+        self.context += f"\n\n<ACTION_LOG>\n{action_summary}\n</ACTION_LOG>\n"
         yield EventBuilder.DM_message(narrative) # type: ignore
 
         if is_NPC: outcome.is_legal = True
         
         if outcome.is_legal:
-            for i, change in enumerate(changes, 1):
-                self.context += f"<Action outcomes>"
-                self.context += f"\n{i}. {change.object_name} -> ({change.changes})"
-                if change.object_type == "character":
-                    await self.update_character(change.object_name, change.changes)
-                elif change.object_type == "scene":
-                    await self.update_scene(change.object_name, change.changes)
-                    
-                yield EventBuilder.state_update_required(
-                    update=f"{change.object_name} был обновлен ({change.changes})",
-                    total=len(changes), 
-                    current=i
-                )
-                yield EventBuilder.alert(f"{change.object_name}: {change.changes}")
+            if changes:
+                for i, change in enumerate(changes, 1):
+                    if change.object_type == "character":
+                        await self.update_character(change.object_name, change.changes)
+                    elif change.object_type == "scene":
+                        await self.update_scene(change.object_name, change.changes)
+                        
+                    yield EventBuilder.state_update_required(
+                        update=f"{change.object_name} был обновлен ({change.changes})",
+                        total=len(changes), 
+                        current=i
+                    )
+                    yield EventBuilder.alert(f"{change.object_name}: {change.changes}")
+            else:
+                self.context += "<ACTION_OUTCOMES>No structural changes occurred.</ACTION_OUTCOMES>"
             print(f"{SUCCESS_COLOR}All changes applied successfully{Colors.RESET}")    
-            self.context += f"</Action outcomes>"
             async for value in self.after_action(outcome):
                 yield value
         else:
-            self.context += f"\nNothinig happens...\n"
+            self.context += f"\n<ACTION_FAILURE>Action by {character.name} ('{action_text}') was deemed illegal. No changes were made.</ACTION_FAILURE>\n"
             yield EventBuilder.alert("Impossible to act...")
         
     async def askedDM(self, character: Character, question: str):
@@ -292,17 +370,18 @@ Your response must be ONLY the complete, updated JSON object for the character. 
         Handles a character asking the DM a question, ensuring the response is in the second person.
         """
         print(f"\n{ENTITY_COLOR}{character.name}{Colors.RESET} {INFO_COLOR}asks:{Colors.RESET} {question}")
+        self.log_event("asked_dm", character_name=character.name, question=question)
         
         # Pass the active character's name to get the right context
         context_with_active_char = self.get_actual_context(active_character_name=character.name)
         
         prompt = f"""
 <ROLE>
-You are the Dungeon Master (DM). Your primary role is to be an impartial referee and a vivid storyteller. A player is asking you a question directly. You must answer them in a helpful and direct manner.
+{global_defines.dungeon_master_core_prompt}
 </ROLE>
 
 <TASK>
-1.  **Identify the Player:** In the `<CONTEXT_DATA>`, find the character where `is_currently_acting` is `true`. This is the player you are speaking to.
+1.  **Identify the Player:** In the `<CONTEXT_DATA>` and `<PLAYER_WHO_IS_ASKING>`, find the character where `is_currently_acting` is `true`. This is the player you are speaking to.
 2.  **Address Them Directly:** Formulate your response in the second person, as if you are speaking directly to that player. Use "you" and "your".
 3.  **Answer the Question:** Based on the full context provided, answer the player's question clearly and concisely.
 4.  **Use Highlighting:** Emphasize important keywords and names using `<span class='keyword'>keyword</span>` and `<span class='name'>Name</span>` tags.
@@ -318,14 +397,17 @@ You are the Dungeon Master (DM). Your primary role is to be an impartial referee
 {context_with_active_char}
 </CONTEXT_DATA>
 
+<PLAYER_WHO_IS_ASKING>
+{character.name}
+</PLAYER_WHO_IS_ASKING>
+
 <PLAYER_QUESTION>
 "{question}"
 </PLAYER_QUESTION>
-
-Your response:
 """
         reply = self.classifier.general_text_llm_request(prompt)
-        self.context += f"<Interaction>{character.name} asks DM: {question}\nDM's response: {reply}</Interaction>\n"
+        self.context += f"<player asked the DM>{character.name} asks DM: {question}\nDM's response: {reply}</player asked the DM>\n"
+        self.log_event("dm_reply", character_name=character.name, reply=reply)
         yield EventBuilder.DM_message(reply)
 
     def trim_context(self):
@@ -361,6 +443,8 @@ Your response:
         Processes a character's interaction, deciding the outcome of actions and questions.
         Returns a tuple containing the event generator and a boolean indicating if a turn-consuming action was taken.
         """
+        if not character.is_alive:
+            return self.askedDM(character, interaction), False
         decision: ClassifyInformationOrActionRequest = self.classifier.generate(
     contents=f"""
 <ROLE>
@@ -415,11 +499,23 @@ Provide your response as a single JSON object matching the `ClassifyInformationO
             print(f"{INFO_COLOR}Request for action {Colors.RESET}")
             return self.action(character, interaction), True
     
-    def get_character_by_name(self, name:str) -> Character:
-        for char in self.characters:
-            if  char.name == name:
-                return char
-        return self.characters[0]
+    def get_character_by_name(self, name: str) -> Character:
+        """
+        Finds and returns a character object by its name using fuzzy matching.
+
+        :param name: The name of the character to find.
+        :return: The Character object with the closest matching name.
+        :raises Exception: If no character is found.
+        """
+        char_name_list = [char.name for char in self.characters]
+        char_dict = {char.name: char for char in self.characters}
+        
+        try:
+            target_char_name = find_closest_match(name, char_name_list)
+            return char_dict[target_char_name]
+        except ValueError as e:
+            # Re-raise with a more specific message
+            raise Exception(f"Character '{name}' not found. {e}")
     
     
     async def after_action(self, outcome:ActionOutcome):
@@ -457,36 +553,75 @@ Provide your response as a single JSON object matching the `ClassifyInformationO
         )
         print(f"\n{HEADER_COLOR} Analyzing narrative turn outcome...{Colors.RESET}")
         print(f"{DEBUG_COLOR}Raw analysis: {analisys}{Colors.RESET}")
-        try:
-            for i, change in enumerate(analisys.proactive_world_changes, 1):
-                # Ensure change_type is a valid enum member before matching
+        
+        for i, change in enumerate(analisys.proactive_world_changes, 1):
+            try:
                 if not isinstance(change.change_type, ProactiveChangeType):
                     print(f"{WARNING_COLOR}Skipping invalid change type: {change.change_type}{Colors.RESET}")
                     continue
 
-                payload = change.payload # type: ignore
-                match change.change_type: # type: ignore
-                    case ProactiveChangeType.ADD_OBJECT | ProactiveChangeType.UPDATE_OBJECT | ProactiveChangeType.REMOVE_OBJECT: # type: ignore
-                        if payload.object_type == "character": # type: ignore
+                payload = change.payload
+                match change.change_type:
+                    case ProactiveChangeType.ADD_OBJECT | ProactiveChangeType.UPDATE_OBJECT | ProactiveChangeType.REMOVE_OBJECT | ProactiveChangeType.UPDATE_SCENE:
+                        try:
+                            if payload.object_type == "character": # type: ignore
+                                await self.update_character(payload.object_name, payload.changes) # type: ignore
+                            elif payload.object_type == "scene": # type: ignore
+                                await self.update_scene(payload.object_name, payload.changes) # type: ignore
+                            yield EventBuilder.alert(f"(narrative){payload.object_name}: {payload.changes}") # type: ignore
+                        except Exception as e:
+                            yield EventBuilder.error(f"Error processing object change for '{getattr(payload, 'object_name', 'N/A')}': {e}")
+                            print(f"{ERROR_COLOR}Error in object change: {e}{Colors.RESET}")
+
+                    case ProactiveChangeType.ADD_CHARACTER:
+                        try:
+                            new_character : Character = self.generator.generate(Character, change.description, self.context, "Russian") # type: ignore
+                            self.characters.append(new_character)
+                            yield EventBuilder.alert(f"(narrative) A new character, {new_character.name}, appears: {change.description}")
+                        except Exception as e:
+                            yield EventBuilder.error(f"Error adding character: {e}")
+                            print(f"{ERROR_COLOR}Error in ADD_CHARACTER: {e}{Colors.RESET}")
+
+                    case ProactiveChangeType.REMOVE_CHARACTER:
+                        try:
+                            if not isinstance(payload, str):
+                                raise TypeError(f"REMOVE_CHARACTER payload must be a string, but got {type(payload)}")
+                            char = self.get_character_by_name(payload)
+                            self.characters.remove(char)
+                            yield EventBuilder.alert(f"(narrative){payload} was removed: {change.description}")
+                        except Exception as e:
+                            yield EventBuilder.error(f"Error removing character '{payload}': {e}")
+                            print(f"{ERROR_COLOR}Error in REMOVE_CHARACTER: {e}{Colors.RESET}")
+
+                    case ProactiveChangeType.UPDATE_CHARACTER:
+                        try:
+                            if not hasattr(payload, 'object_name'):
+                                raise TypeError(f"UPDATE_CHARACTER payload is not a valid ChangesToMake object: {payload}")
                             await self.update_character(payload.object_name, payload.changes) # type: ignore
-                        elif payload.object_type == "scene": # type: ignore
-                            await self.update_scene(payload.object_name, payload.changes) # type: ignore
-                        
-                        # Yield events to notify clients # type: ignore
-                        yield EventBuilder.alert(f"{payload.object_name}: {payload.changes}") # type: ignore
-                        yield EventBuilder.state_update_required( # type: ignore
-                            update=f"{payload.object_name} был обновлен ({payload.changes})",  # type: ignore
-                            total=len(analisys.proactive_world_changes),  # type: ignore
-                            current=i # type: ignore
-                        ) # type: ignore
+                            yield EventBuilder.alert(f"(narrative){payload.object_name} was updated: {change.description}") # type: ignore
+                        except Exception as e:
+                            yield EventBuilder.error(f"Error updating character '{getattr(payload, 'object_name', 'N/A')}': {e}")
+                            print(f"{ERROR_COLOR}Error in UPDATE_CHARACTER: {e}{Colors.RESET}")
+
+                    case ProactiveChangeType.CHANGE_SCENE:
+                        try:
+                            if not isinstance(payload, NextScene):
+                                raise TypeError(f"CHANGE_SCENE payload must be a NextScene object, but got {type(payload)}")
+                            self.generate_scene(payload)
+                            yield EventBuilder.alert(f"Scene changed: {change.description}")
+                        except Exception as e:
+                            yield EventBuilder.error(f"Error changing scene: {e}")
+                            print(f"{ERROR_COLOR}Error in CHANGE_SCENE: {e}{Colors.RESET}")
+                            
                     case _:
-                        # This case handles any other valid enum members that might be added in the future
                         print(f"{WARNING_COLOR}Unhandled proactive change type: {change.change_type}{Colors.RESET}")
 
-        except Exception as e:
-            yield EventBuilder.error(f"Error occurred during narrative turn analysis: {e}")
-            print(f"{ERROR_COLOR}Error occurred during narrative turn analysis: {e}{Colors.RESET}")
-            raise e
+            except Exception as e:
+                yield EventBuilder.error(f"Outer error in after_narrative loop for change '{change.change_type}': {e}")
+                print(f"{ERROR_COLOR}Critical error processing change '{change.change_type}': {e}{Colors.RESET}")
+                # Continue to the next change to avoid a single failure stopping all subsequent changes.
+                continue
+        self.story_manager.check_and_advance(self.context)
 
     async def NPC_turn(self):
         """
@@ -530,33 +665,16 @@ Provide your response as a single JSON object matching the `ClassifyInformationO
 if __name__ == "__main__":
     load_dotenv()
 
-    # character damage test
-    # print(f"{HEADER_COLOR}🎮 Starting new chapter...{Colors.RESET}")
-    # chapter = ChapterLogicFight(context = "the journey begins...")
-    # chapter.setup_fight()
-    # r_ch = chapter.generator.generate(Character, "random character with full hp and no items in inventory", "no context", "Russian")
-    # print(r_ch.model_dump_json(indent=2))
-    # chapter.characters.append(r_ch)
-    # chapter.update_character(r_ch.name, "получил 10 урона и потерял глаз")
-    # print(chapter.characters[0].model_dump_json(indent=2))
-    
-    # scene change test
-    # print(f"{HEADER_COLOR}🎮 Starting new chapter...{Colors.RESET}")
-    # chapter = ChapterLogicFight(context = "the journey begins...")
-    # chapter.setup_fight()
-    # r_ch = chapter.generator.generate(Character, "random character with full hp and no items in inventory", "no context", "Russian")
-    # print(r_ch.model_dump_json(indent=2))
-    # chapter.characters.append(r_ch)
-    # hhh = input("enter a question to a DM...    ")
-    # print(chapter.process_interaction(chapter.characters[0], hhh)) # type: ignore
-    
+    # Setup the story
+    story_manager = StoryManager("campaigns/campaign.json")
     
     # enemy turn test
     generator = ObjectGenerator()
     context = "A ground beneeth the grand tree"
     print(f"{HEADER_COLOR}🎮 Starting new chapter (enemy turn test)...{Colors.RESET}")
-    chapter = ChapterLogicFight(
+    chapter = Chapter(
         context = context,
+        story_manager=story_manager,
         characters = [
             generator.generate(Character, "Борис Бритва with full hp (50 hp) and a single dager (player character)", context, "Russian"),
             generator.generate(Character, "random monster with full hp (50 hp) and some magic spells (enemy NPC)", context, "Russian")

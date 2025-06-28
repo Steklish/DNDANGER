@@ -1,14 +1,13 @@
 import json
-from math import e
 from multiprocessing import allow_connection_pickling
-from re import A
-from traceback import print_tb
-from chapter_logic import ChapterLogicFight
+from chapter_logic import Chapter
+from classifier import Classifier
 from generator import ObjectGenerator
-from models.reuqest_types import GameMode
+from models.game_modes import GameMode
 from models.schemas import Character
 from server_communication import *
 from server_communication.events import EventBuilder
+from story_manager import StoryManager
 from global_defines import *
 import asyncio
 MAX_MESSAGE_HISTORY_LENGTH = 100
@@ -28,26 +27,33 @@ class Game:
         self.listeners = []
         self.listener_names = [] # character names
         self.generator = ObjectGenerator()
-        self.context = "Врата проклятой крепости"
-        self.chapter = ChapterLogicFight(
-            context = self.context,
-            characters = [
-                self.generator.generate(Character, "Призрак доспеха из слизи HP 30,  (NPC)", self.context, "Russian"),
-                # self.generator.generate(Character, "Призрак (какой-нибудь) с HP по 30, урон корнями и виноградными плетями. (NPC)", self.context, "Russian"),
-                # self.generator.generate(Character, "странник из света (CR 1, кастует простые иллюзии, ослепление) ➤ Угрозы умеренные, но запоминающиеся. (enemy NPC)", self.context, "Russian"),
-                # self.generator.generate(Character, "Яша Лава - ЛАвовый голем with full hp (10 hp) random inventory (non-player character)", self.context, "Russian"),
-                # self.generator.generate(Character, "Яша Лужа - Водяной голем with full hp (50 hp) random inventory (non-player character)", self.context, "Russian"),
-                self.generator.generate(Character, "Ли Хуй С Ним - оживший шкафчик в котором спавнится рандомный предмет из средств личной гигиены который может взрываться. Оружие - дверца и шуфлятка with full hp (20 hp) random inventory (player character)", self.context, "Russian"),
-                self.generator.generate(Character, "Горло - маг с кучей темных заклинаний with full hp (20 hp) random inventory (player character)", self.context, "Russian"),
-            ]
+        self.classifier = Classifier()
+        self.context = ""
+        self.story_manager = StoryManager("campaigns/campaign.json")
+        self.context = self.story_manager.get_current_plot_context()
+
+        # Generate the initial NPC based on the campaign's starting prompt
+        initial_npc = self.generator.generate(
+            Character,
+            self.story_manager.story.initial_character_prompt,
+            self.context,
+            "Russian"
+        )
+
+        self.chapter = Chapter(
+            context=self.context,
+            story_manager=self.story_manager,
+            characters=[initial_npc]
         )
         self.chapter.game_mode = GameMode.NARRATIVE
-        self.announce(EventBuilder.DM_message(self.chapter.scene.description)) # type: ignore
-        message = {
-            "message_text": self.chapter.scene.description, # type: ignore
-            "sender_name": "DM"
-        }
-        self.add_message_to_history(message)
+
+        # Announce the starting location and initial scene description
+        # await self.announce(EventBuilder.DM_message(f"Вы находитесь в '{self.story_manager.story.starting_location}'. {self.chapter.scene.description}")) # type: ignore
+        # message = {
+        #     "message_text": f"Вы находитесь в '{self.story_manager.story.starting_location}'. {self.chapter.scene.description}", # type: ignore
+        #     "sender_name": "DM"
+        # }
+        # self.add_message_to_history(message)
         self.turn_completed_event = asyncio.Event()
         
         
@@ -58,6 +64,25 @@ class Game:
         """
         self = cls()  # Synchronous __init__
         return self
+
+    async def introduce_scene(self):
+        """
+        Generates and announces the initial scene introduction.
+        """
+        prompt = (
+            f"The game is starting. The players are in '{self.story_manager.story.starting_location}'. "
+            f"The current scene is: {self.chapter.scene.description}. " # type: ignore
+            "Write a compelling introduction from the Dungeon Master's perspective to set the mood and describe the initial surroundings. "
+            "Emphasize important keywords and names using `<span class='keyword'>keyword</span>` and `<span class='name'>Name</span>` tags."
+        )
+        introduction = self.classifier.general_text_llm_request(prompt + self.context, "Russian")
+        
+        message = {
+            "message_text": introduction,
+            "sender_name": "DM"
+        }
+        self.add_message_to_history(message)
+        await self.announce(EventBuilder.DM_message(introduction))
 
     async def game_loop(self):
         """
@@ -250,3 +275,33 @@ class Game:
         self.message_history.append(message)
         if len(self.message_history) > MAX_MESSAGE_HISTORY_LENGTH:
             self.message_history.pop(0)
+
+    async def add_player_character(self, character: Character):
+        """
+        Adds a new player character to the game.
+        """
+        self.chapter.characters.append(character)
+        await self.announce(EventBuilder.player_joined(character.name, self.listener_names))
+
+    def update_character(self, character_name: str, updates: dict):
+        """
+        Updates a character's attributes.
+        """
+        character = self.chapter.get_character_by_name(character_name)
+        if character:
+            for key, value in updates.items():
+                if hasattr(character, key):
+                    setattr(character, key, value)
+            return character
+        return None
+
+    async def delete_character(self, character_name: str):
+        """
+        Deletes a character from the game.
+        """
+        character = self.chapter.get_character_by_name(character_name)
+        if character:
+            self.chapter.characters.remove(character)
+            await self.announce(EventBuilder.player_left(character.name, self.listener_names))
+            return True
+        return False

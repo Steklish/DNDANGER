@@ -1,14 +1,16 @@
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from chapter_logic import ChapterLogicFight
+    from chapter_logic import Chapter
+    from story_manager import StoryManager
 
 import global_defines
-from models.reuqest_types import *
+from models.game_modes import GameMode
 from models.schemas import *
 
 
+
 class Prompter:
-    def get_narrative_analysis_prompt(self, chapter: 'ChapterLogicFight') -> str:
+    def get_narrative_analysis_prompt(self, chapter: 'Chapter') -> str:
         """
         Generates a prompt for an LLM to act as a Narrative Director.
         This function now pulls its context from the instance's state.
@@ -21,7 +23,7 @@ class Prompter:
 </SYSTEM>
 
 <ROLE>
-Ты — Повествовательный Режиссёр (Narrative Director). Твоя задача — сделать мир живым и отзывчивым. Проанализировав действие игрока, ты должен определить, как на него отреагируют NPC и изменится ли мир или сюжет. Ты НЕ описываешь это игроку, а создаешь структурированные инструкции для игрового движка.
+Ты — Повествовательный Режиссёр (Narrative Director). Твоя задача — сделать мир живым и отзывчивым. Проанализировав действие игрока, ты должен определить, как на него отреагируют NPC и изменится ли мир или сюжет. Ты НЕ описываешь это игроку, а создаешь структури��ованные инструкции для игрового движка.
 </ROLE>
 
 <GOAL>
@@ -40,7 +42,7 @@ class Prompter:
     *   **Продвижение сюжета:** Действие игрока выполнило условие для развития истории (например, он нашел ключ, и теперь в `proactive_world_changes` должно быть описание того, что секретная дверь в стене теперь может быть открыта).
     *   **Изменение состояния мира:** Действие игрока необратимо изменило окружение (поджег здание, обрушил мост, активировал древний механизм).
     *   **Отложенные последствия:** Действие будет иметь последствие позже. (Например, игрок оскорбил дворянина. `proactive_world_changes` может содержать `ADD_OBJECT` для "Наемного убийцы", который появится позже).
-    *   **Смена сцены:** Если действие игрока завершает текущую сцену (он выходит из таверны, телепортируется), используй `change_type: CHANGE_SCENE`.
+    *   **Смена сцены:** Если действие игрока завершает текущую сцену (он выход��т из таверны, телепортируется), используй `change_type: CHANGE_SCENE`.
 
 3.  **Ключевое правило:** НЕ ПЕРЕУСЕРДСТВУЙ. Если игрок просто осматривается или говорит что-то незначительное, мир не должен реагировать. **Пустые списки `[]` — это валидный и частый результат.**
 
@@ -62,7 +64,7 @@ class Prompter:
 </TASK>
 """
 
-    def get_action_prompt(self, chapter: 'ChapterLogicFight', character: Character, action_text: str, is_NPC: bool = False) -> str:
+    def get_action_prompt(self, chapter: 'Chapter', character: Character, action_text: str, is_NPC: bool = False) -> str:
 
         return f"""
 <SYSTEM>
@@ -126,12 +128,12 @@ You are a Dungeon Master's assistant. Your primary role is to interpret player a
 </RULES>
 
 <OUTPUT_FORMAT>
-Твой ответ ДОЛЖЕН быть ОДНИМ JSON-объектом, БЕЗ каких-либо дополнительных пояснений ��ли текста до/после него. JSON должен строго соответствовать Pydantic-модели `ActionOutcome`.
+Твой ответ ДОЛЖЕН быть ОДНИМ JSON-объектом, БЕЗ каких-либо дополнительных пояснений или текста до/после него. JSON должен строго соответствовать Pydantic-модели `ActionOutcome`.
 -   `narrative_description`: Красочное описание для игрока. **ОБЯЗАТЕЛЬНО** используй эти HTML-теги:
     -   `<span class="name">Имя</span>` для имен и названий.
     -   `<span class="damage">описание урона</span>` для любого вреда.
     -   `<span class="heal">описание исцеления</span>` для восстановления здоровья.
-    -   `<span class="condition">описание состояния</span>` для наложения эффектов.
+    -   `<span class="condition">описание сосстояния</span>` для наложения эффектов.
 -   `structural_changes`: Список объектов, описывающих конкретные изменения. Также используй теги. Обязательно указывай числа и результаты бросков, а не сами броски. Если изменений нет, оставь пустым `[]`.
 -   `is_legal`: `true` или `false`.
 
@@ -155,7 +157,7 @@ You are a Dungeon Master's assistant. Your primary role is to interpret player a
 </TASK>
 """
     
-    def get_turn_analysis_prompt(self, chapter: 'ChapterLogicFight', current_mode: GameMode) -> str:
+    def get_turn_analysis_prompt(self, chapter: 'Chapter', current_mode) -> str: # current_mode: GameModeDecision
         """
         Generates a prompt for the LLM to act as a Game Director, analyzing
         if the game state should switch between COMBAT and NARRATIVE modes.
@@ -174,7 +176,7 @@ You are a Dungeon Master's assistant. Your primary role is to interpret player a
 </GOAL>
 
 <DEFINITIONS>
-- **`COMBAT` (Боевой режим):** Структурированный, пошаговый режим. Используется, когда начались активные боевы�� действия. Время течет дискретно (раунд за раундом). Персонажи совершают действия по очереди.
+- **`COMBAT` (Боевой режим):** Структурированный, пошаговый режим. Используется, когда начались активные боевые действия. Время течет дискретно (раунд за раундом). Персонажи совершают действия по очереди.
 - **`NARRATIVE` (Повествовательный режим):** Свободный режим. Используется для диалогов, исследований, путешествий и решения головоломок. Время течет плавно, и персонажи могут действовать свободно, без строгой очередности.
 </DEFINITIONS>
 
@@ -194,21 +196,62 @@ You are a Dungeon Master's assistant. Your primary role is to interpret player a
 
 3.  **Сохранение текущего режима:**
     *   Если игра в режиме `COMBAT` и персонаж просто атакует следующего врага, режим остается `COMBAT`.
-    *   Если игра в режиме `NARRATIVE` и персонаж просто продолжает диалог или исследует комнату, режим остается `NARRATIVE`.
+    *   Если игра в режиме `NARRATIVE` и п��рсонаж просто продолжает диалог или исследует комнату, режим остается `NARRATIVE`.
 </HEURISTICS_FOR_DECISION>
 
 <OUTPUT_FORMAT>
 Твой ответ ДОЛЖЕН быть ОДНИМ JSON-объектом, БЕЗ каких-либо дополнительных пояснений или текста до/после него. JSON должен строго соответствовать Pydantic-модели `TurnAnalysisOutcome`.
 -   `recommended_mode`: `COMBAT` или `NARRATIVE`.
--   `analysis_summary`: Краткое и чёткое объяснение твоего выбора на русском языке. Почему ты рекомендуеш�� именно этот режим?
+-   `analysis_summary`: Краткое и чёткое объяснение твоего выбора на русском языке. Почему ты рекомендуешь именно этот режим?
 </OUTPUT_FORMAT>
 
 <CONTEXT>
-- **Текущий режим игры:** `{current_mode.value}`
+- **Текущий режим игры:** `{current_mode.new_mode}`
 - **Общая обстановка:** {chapter.get_actual_context()}
 </CONTEXT>
 
 <TASK>
 Проанализируй предоставленный контекст и сгенерируй JSON-объект `TurnAnalysisOutcome`.
+</TASK>
+"""
+
+    def get_story_progression_prompt(self, story_manager: 'StoryManager', context: str) -> str:
+        """
+        Generates a prompt for the LLM to determine if the story's completion conditions have been met.
+        """
+        current_plot_point = story_manager.get_current_plot_point()
+        if not current_plot_point:
+            raise ValueError("No current plot point found.")
+            # return "" # Should not happen if called correctly
+
+        return f"""
+<ROLE>
+You are a Story Progression Engine. Your task is to analyze the recent events in the game and determine if the players have successfully met the completion conditions for the current chapter of the story.
+</ROLE>
+
+<GOAL>
+Based on the provided context and completion conditions, you must decide if the story should advance to the next plot point.
+</GOAL>
+
+<STORY_CONTEXT>
+The overarching goal of the campaign '{story_manager.story.title}' is: {story_manager.story.main_goal}.
+The current active chapter of the story is '{current_plot_point.title}'.
+The objective for this chapter is: {current_plot_point.description}.
+</STORY_CONTEXT>
+
+<COMPLETION_CONDITIONS>
+To advance the story, the players need to achieve this: "{current_plot_point.completion_conditions}"
+</COMPLETION_CONDITIONS>
+
+<RECENT_EVENTS>
+{context}
+</RECENT_EVENTS>
+
+<TASK>
+Analyze the <RECENT_EVENTS> and determine if they satisfy the <COMPLETION_CONDITIONS>.
+Your response must be ONLY a valid JSON object that conforms to the `StoryProgressionCheck` schema.
+- Set `conditions_met` to `true` if the objective is complete.
+- Set `conditions_met` to `false` if the objective is not yet complete.
+- Provide a brief `reasoning` for your decision.
 </TASK>
 """

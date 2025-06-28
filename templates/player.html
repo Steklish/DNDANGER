@@ -22,87 +22,115 @@
                 <span class="material-icons">close</span>
             </button>
         </div>
-        <!-- Обновленное содержимое бокового меню -->
+        <div class="menu-tabs">
+            <button class="tab-link active" data-tab="characterTab">Character</button>
+            <button class="tab-link" data-tab="combatTab">Combat</button>
+            <button class="tab-link" data-tab="worldTab">World</button>
+        </div>
         <div class="menu-content">
-            <!-- Основная информация о персонаже -->
-            <div class="menu-item">
-                <span class="material-icons">person</span>
-                <span>Basic Info</span>
-                <div class="menu-dropdown" id="basicInfoDropdown">
-                    <h3>Character Stats</h3>
-                    <div id="characterBasicInfo">
-                        <p><strong>Name:</strong> <span id="charName">Loading...</span></p>
-                        <p><strong>HP:</strong> <span id="charHP">Loading...</span></p>
-                        <p><strong>AC:</strong> <span id="charAC">Loading...</span></p>
+            <!-- Character Tab -->
+            <div id="characterTab" class="tab-content active">
+                <!-- Basic Info -->
+                <div class="menu-item">
+                    <div class="menu-item-header">
+                        <span class="material-icons">person</span>
+                        <span>Basic Info</span>
+                    </div>
+                    <div class="menu-dropdown">
+                        <p><strong>Name:</strong> <span id="charName"></span></p>
+                        <p><strong>HP:</strong> <span id="charHP"></span></p>
+                        <p><strong>AC:</strong> <span id="charAC"></span></p>
+                        <p><strong>Gender:</strong> <span id="charGender"></span></p>
                         <div id="charConditions">
                             <strong>Conditions:</strong>
                             <ul id="conditionsList"></ul>
                         </div>
                     </div>
                 </div>
-            </div>
-
-            <!-- Инвентарь -->
-            <div class="menu-item">
-                <span class="material-icons">inventory_2</span>
-                <span>Inventory</span>
-                <div class="menu-dropdown" id="inventoryDropdown">
-                    <h3>Equipment & Items</h3>
-                    <div id="inventoryList">
-                        <!-- Предметы будут добавляться динамически -->
+                <!-- Stats -->
+                <div class="menu-item">
+                    <div class="menu-item-header">
+                        <span class="material-icons">shield</span>
+                        <span>Stats</span>
                     </div>
-                </div>
-            </div>
-
-            <!-- Способности -->
-            <div class="menu-item">
-                <span class="material-icons">auto_awesome</span>
-                <span>Abilities</span>
-                <div class="menu-dropdown" id="abilitiesDropdown">
-                    <h3>Character Abilities</h3>
-                    <div id="abilitiesList">
-                        <!-- Способности будут добавляться динамически -->
-                    </div>
-                </div>
-            </div>
-
-            <!-- История персонажа -->
-            <div class="menu-item">
-                <span class="material-icons">history_edu</span>
-                <span>Background</span>
-                <div class="menu-dropdown" id="backgroundDropdown">
-                    <h3>Character History</h3>
-                    <div id="personalityHistory">
-                        <!-- История персонажа будет добавлена динамически -->
-                    </div>
-                </div>
-            </div>
-
-            <!-- Информация о сцене -->
-            <div class="menu-item">
-                <span class="material-icons">landscape</span>
-                <span>Scene</span>
-                <div class="menu-dropdown" id="sceneDropdown">
-                    <h3>Current Location</h3>
-                    <div id="sceneInfo" class="scene-info-scroll">
-                        <p><strong>Name:</strong> <span id="sceneName"></span></p>
-                        <p><strong>Description:</strong> <span id="sceneDescription"></span></p>
-                        <p><strong>Size:</strong> <span id="sceneSize"></span></p>
-                        <div id="sceneObjects">
-                            <h4>Objects in Scene:</h4>
+                    <div class="menu-dropdown">
+                        <div class="stats-grid">
+                            <p><strong>STR:</strong> <span id="charStr"></span></p>
+                            <p><strong>DEX:</strong> <span id="charDex"></span></p>
+                            <p><strong>CON:</strong> <span id="charCon"></span></p>
+                            <p><strong>INT:</strong> <span id="charInt"></span></p>
+                            <p><strong>WIS:</strong> <span id="charWis"></span></p>
+                            <p><strong>CHA:</strong> <span id="charCha"></span></p>
                         </div>
                     </div>
                 </div>
+                <!-- Appearance -->
+                <div class="menu-item">
+                    <div class="menu-item-header">
+                        <span class="material-icons">visibility</span>
+                        <span>Appearance</span>
+                    </div>
+                    <div class="menu-dropdown">
+                        <p id="charAppearance"></p>
+                        <p id="charClothing"></p>
+                    </div>
+                </div>
+                <!-- Background -->
+                <div class="menu-item">
+                    <div class="menu-item-header">
+                        <span class="material-icons">history_edu</span>
+                        <span>Background</span>
+                    </div>
+                    <div class="menu-dropdown">
+                        <p id="personalityHistory"></p>
+                    </div>
+                </div>
+                <!-- Inventory -->
+                <div class="menu-item">
+                    <div class="menu-item-header">
+                        <span class="material-icons">inventory_2</span>
+                        <span>Inventory</span>
+                    </div>
+                    <div class="menu-dropdown" id="inventoryList"></div>
+                </div>
+                <!-- Abilities -->
+                <div class="menu-item">
+                    <div class="menu-item-header">
+                        <span class="material-icons">auto_awesome</span>
+                        <span>Abilities</span>
+                    </div>
+                    <div class="menu-dropdown" id="abilitiesList"></div>
+                </div>
             </div>
 
-            <!-- История чата -->
-            <div class="menu-item">
-                <span class="material-icons">chat_bubble</span>
-                <span>Chat History</span>
-                <div class="menu-dropdown" id="historyDropdown">
-                    <h3>Recent Messages</h3>
-                    <div id="chatHistory">
-                        <!-- История сообщений будет добавляться динамически -->
+            <!-- Combat Tab -->
+            <div id="combatTab" class="tab-content">
+                <div class="menu-item">
+                    <div class="menu-item-header">
+                        <span class="material-icons">gavel</span>
+                        <span>Turn Order</span>
+                    </div>
+                    <div class="menu-dropdown" id="turnOrderDropdown">
+                        <div id="turnOrderList"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- World Tab -->
+            <div id="worldTab" class="tab-content">
+                <div class="menu-item">
+                    <div class="menu-item-header">
+                        <span class="material-icons">landscape</span>
+                        <span>Scene</span>
+                    </div>
+                    <div class="menu-dropdown" id="sceneDropdown">
+                        <div id="sceneInfo" class="scene-info-scroll">
+                            <h3><span id="sceneName"></span></h3>
+                            <p><strong>Description:</strong> <span id="sceneDescription"></span></p>
+                            <p><strong>Size:</strong> <span id="sceneSize"></span></p>
+                            <h4>Objects:</h4>
+                            <div id="sceneObjects"></div>
+                        </div>
                     </div>
                 </div>
             </div>

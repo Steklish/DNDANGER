@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Создание персонажа</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;700&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body class="character-creation-body">
+    <div class="character-creation-container">
+        <div class="character-card-preview">
+            <div class="card-header">
+                <input type="text" id="name" name="name" placeholder="Имя персонажа" required class="card-input" autocomplete="off">
+            </div>
+            <div class="card-content">
+                <div class="card-section">
+                    <h3>Предыстория</h3>
+                    <textarea id="background" name="background" rows="4" placeholder="Опишите историю и личность вашего персонажа." class="card-textarea" autocomplete="off"></textarea>
+                </div>
+                <div class="card-section">
+                    <h3>Инвентарь</h3>
+                    <textarea id="inventory" name="inventory" rows="3" placeholder="Что есть у вашего персонажа с собой?" class="card-textarea" autocomplete="off"></textarea>
+                </div>
+                <div class="card-section">
+                    <h3>Характеристики</h3>
+                    <p>У вас есть <span id="points-remaining">7</span> очков для распределения.</p>
+                    <div class="stats-grid">
+                        <div class="stat-row">
+                            <label for="strength">Сила (STR): <span id="strength-value">8</span></label>
+                            <div class="stat-control">
+                                <input type="range" id="strength" name="strength" min="6" max="16" value="8" class="stat-slider" data-stat="strength">
+                            </div>
+                        </div>
+                        <div class="stat-row">
+                            <label for="dexterity">Ловкость (DEX): <span id="dexterity-value">8</span></label>
+                            <div class="stat-control">
+                                <input type="range" id="dexterity" name="dexterity" min="6" max="16" value="8" class="stat-slider" data-stat="dexterity">
+                            </div>
+                        </div>
+                        <div class="stat-row">
+                            <label for="constitution">Телосложение (CON): <span id="constitution-value">8</span></label>
+                            <div class="stat-control">
+                                <input type="range" id="constitution" name="constitution" min="6" max="16" value="8" class="stat-slider" data-stat="constitution">
+                            </div>
+                        </div>
+                        <div class="stat-row">
+                            <label for="intelligence">Интеллект (INT): <span id="intelligence-value">8</span></label>
+                            <div class="stat-control">
+                                <input type="range" id="intelligence" name="intelligence" min="6" max="16" value="8" class="stat-slider" data-stat="intelligence">
+                            </div>
+                        </div>
+                        <div class="stat-row">
+                            <label for="wisdom">Мудрость (WIS): <span id="wisdom-value">8</span></label>
+                            <div class="stat-control">
+                                <input type="range" id="wisdom" name="wisdom" min="6" max="16" value="8" class="stat-slider" data-stat="wisdom">
+                            </div>
+                        </div>
+                        <div class="stat-row">
+                            <label for="charisma">Харизма (CHA): <span id="charisma-value">8</span></label>
+                            <div class="stat-control">
+                                <input type="range" id="charisma" name="charisma" min="6" max="16" value="8" class="stat-slider" data-stat="charisma">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="character-creation-controls">
+            <h1>Создание персонажа</h1>
+            <div id="message-container"></div>
+            <form id="character-creation-form">
+                <div id="loading-container" style="display: none;">
+                    <div class="jelly-triangle">
+                        <div class="jelly-triangle__dot"></div>
+                        <div class="jelly-triangle__traveler"></div>
+                    </div>
+                    <svg width="0" height="0" class="jelly-maker">
+                        <defs>
+                            <filter id="uib-jelly-triangle-ooze">
+                                <feGaussianBlur in="SourceGraphic" stdDeviation="7.3" result="blur"></feGaussianBlur>
+                                <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 18 -7" result="ooze"></feColorMatrix>
+                                <feBlend in="SourceGraphic" in2="ooze"></feBlend>
+                            </filter>
+                        </defs>
+                    </svg>
+                </div>
+                <button type="submit" id="create-character-btn" class="btn">Создать персонажа</button>
+                <button type="button" id="back-to-login" class="btn btn-secondary">Назад ко входу</button>
+            </form>
+        </div>
+    </div>
+    <script src="{{ url_for('static', path='js/character_creation.js') }}"></script>
+</body>
+</html>

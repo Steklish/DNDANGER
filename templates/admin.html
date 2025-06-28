@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,700;1,300;1,700&family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+    <header class="header">
+        <h1>Admin Dashboard</h1>
+        <div id="game-mode-indicator"></div>
+    </header>
+
+    <div class="admin-grid">
+        <!-- Story Management -->
+        <div class="grid-card" id="story-card">
+            <div class="card-header">
+                <h2>Story Progression</h2>
+            </div>
+            <div class="card-content">
+                <div id="story-info">
+                    <h3 id="story-title"></h3>
+                    <p id="story-goal"></p>
+                </div>
+                <div id="current-plot-point">
+                    <h4>Current Plot Point</h4>
+                    <p id="plot-point-desc"></p>
+                    <small id="plot-point-conditions"></small>
+                </div>
+                <div class="story-controls">
+                    <button class="btn" onclick="navigateStory('previous')">Previous</button>
+                    <button class="btn" onclick="navigateStory('next')">Next</button>
+                </div>
+                <div id="all-plot-points">
+                    <h4>Jump to Plot Point:</h4>
+                    <select id="plot-point-selector" onchange="jumpToPlotPoint()"></select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Character Roster -->
+        <div class="grid-card" id="characters-card">
+            <div class="card-header">
+                <h2>Character Roster</h2>
+            </div>
+            <div class="card-content" id="character-roster">
+                <!-- Character cards will be injected here by admin.js -->
+            </div>
+        </div>
+
+        <!-- Scene & Environment -->
+        <div class="grid-card" id="scene-card">
+            <div class="card-header">
+                <h2>Scene & Environment</h2>
+            </div>
+            <div class="card-content">
+                <h3 id="scene-name"></h3>
+                <div id="scene-description"></div>
+                <h4>Scene Objects</h4>
+                <div id="scene-objects-list"></div>
+            </div>
+        </div>
+
+        <!-- Debug & Context -->
+        <div class="grid-card" id="debug-card">
+            <div class="card-header">
+                <h2>Debug Information</h2>
+            </div>
+            <div class="card-content">
+                <h4>Current Game Context</h4>
+                <pre id="game-context"></pre>
+                <h4>Chat History</h4>
+                <div id="chat-history"></div>
+                <h4>Event Log</h4>
+                <div id="event-log"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', path='js/admin.js') }}"></script>
+</body>
+</html>

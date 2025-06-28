@@ -94,3 +94,12 @@ class Scene(BaseModel):
     description: str = Field(description="A detailed overview of the scene, including lighting, atmosphere, sounds, and smells. This sets the mood.")
     size_description: str = Field(description="A description of the scene's overall dimensions and scale (e.g., 'a cramped 15x15 foot stone chamber', 'a vast, open field stretching to the horizon').")
     objects: List[SceneObject] = Field(default_factory=list, description="A list of all the notable objects present in the scene, each as a full SceneObject.")
+    difficulty: int = Field(default=0, description="A rating of how challenging the scene is intended to be.")
+
+class ScenePrompt(BaseModel):
+    """
+    Used to guide the generation of a new scene.
+    """
+    scene_name: str = Field(description="A short, evocative title for the scene (e.g., 'The Abandoned Library', 'Goblin Ambush Site').")
+    scene_description: str = Field(description="A detailed overview of the scene, including lighting, atmosphere, sounds, and smells. This sets the mood.")
+    difficulty: int = Field(default=0, description="A rating of how challenging the scene is intended to be.")
