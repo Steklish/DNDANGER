@@ -1,6 +1,7 @@
 // Инициализируем обработчики событий после загрузки DOM
 document.addEventListener('DOMContentLoaded', function() {
     let lockInputNonce = 0;
+    let scene
     // Получаем ссылки на основные элементы интерфейса
     const messageInput = document.getElementById('message-input');
     const sendButton = document.getElementById('send-button');
@@ -72,7 +73,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (data.allowed_players.includes(character_name)) {
                     unlock_input();
                 } else {
-                    lock_input(data.allowed_players.length !== 0);
+                    if (data.game_mode != "NARRATIVE"){
+                        lock_input(data.allowed_players.length !== 0);
+                    } 
                 }
                 if (data.game_mode == "NARRATIVE" && data.lock_all == false){
                     unlock_input();
@@ -177,21 +180,21 @@ document.addEventListener('DOMContentLoaded', function() {
     const PLAYER_COLORS = 8; // Number of player colors defined in CSS
 
     function simpleHashCode(str) {
-    let hash = 0;
-    if (str.length === 0) {
-        return hash;
-    }
-    
-    for (let i = 0; i < str.length; i++) {
-        const char = str.charCodeAt(i);
-        hash = (hash << 5) - hash + char;
+        let hash = 0;
+        if (str.length === 0) {
+            return hash;
+        }
         
-        // Convert to a 32bit integer
-        hash |= 0; 
+        for (let i = 0; i < str.length; i++) {
+            const char = str.charCodeAt(i);
+            hash = (hash << 5) - hash + char;
+            
+            // Convert to a 32bit integer
+            hash |= 0; 
+        }
+        // Ensure the result is a non-negative number.
+        return Math.abs(hash);
     }
-    // Ensure the result is a non-negative number.
-    return Math.abs(hash);
-}
 
     function getPlayerColor(name) {
         const hash = simpleHashCode(name);
@@ -413,6 +416,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 </div>
             `).join('') || '<p>No objects in this scene.</p>';
         }
+        
+        const event = new CustomEvent('scene_changed', { detail: scene });
+        document.dispatchEvent(event);
     }
 
     // Открытие бокового меню
@@ -497,21 +503,18 @@ document.addEventListener('DOMContentLoaded', function() {
             .catch(error => {
                 console.error('Error fetching initial data:', error);
             });
-
-    }
-
+        }
+        
     refresh()
+
+    document.addEventListener('scene_changed', (e) => {
+        loadBackgroundImageWithRetries(e.detail);
+    });
+    
     // Выполняем первоначальную загрузку данных
+    function loadBackgroundImageWithRetries(scene){
+        console.log("Changing chat bg",  scene.name);
+        chatMessages.style.backgroundImage = `url('/static/images/${scene.name}.png')`
+        // chatMessages.style.backgroundColor = "white"
+    }
 });
-
-
-
-// main_player.js:123 ДЕД
-// main_player.js:39 {event: 'player_joined', data: 'ДЕД', listeners: Array(11), sender: 'server'}
-// main_player.js:39 {event: 'player_joined', data: 'Антон', listeners: Array(12), sender: 'server'}data: "Антон"event: "player_joined"listeners: (12) ['Антон', 'Антон', 'Антон', 'Антон', 'Антон', 'ДЕД', 'Антон', 'ДЕД', 'Антон', 'ДЕД', 'ДЕД', 'Антон']sender: "server"[[Prototype]]: Object
-// main_player.js:104  EventSource failed: Event {isTrusted: true, type: 'error', target: EventSource, currentTarget: EventSource, eventPhase: 2, …}
-// document.addEventListener.eventSource.onerror @ main_player.js:104
-// /stream?name=%D0%94%D0%95%D0%94:1 
-            
-            
-//             GET https://dndanger-production.up.railway.app/stream?name=%D0%94%D0%95%D0%94 net::ERR_CONNECTION_RESET 200 (OK)

@@ -470,6 +470,7 @@ select:focus {
     border-bottom: 1px solid var(--divider);
     position: relative; /* Добавляем для правильного позиционирования */
     transition: background-color 0.3s ease, color 0.3s ease;
+    z-index: 1;
 }
 
 #character_name {
@@ -483,6 +484,7 @@ select:focus {
     transition: color 0.3s ease;
 }
 
+
 .chat-messages {
     flex: 1;
     padding: 16px;
@@ -490,7 +492,32 @@ select:focus {
     display: flex;
     flex-direction: column;
     gap: 12px;
+    position: relative;
+    isolation: isolate; /* Create a new stacking context */
 }
+
+.chat-messages::before {
+    content: '';
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-image: inherit; /* Inherit from the parent .chat-messages */
+    background-size: cover;
+    background-position: center;
+    z-index: -2; /* Place behind the overlay */
+}
+
+.chat-messages::after {
+    content: '';
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5); /* 50% transparent black */
+    backdrop-filter: blur(8px);
+    filter: saturate(60%);
+    -webkit-backdrop-filter: blur(8px); /* For Safari */
+    z-index: -1; /* Place between the background and content */
+}
+
+
 
 .message {
     max-width: 75%;
@@ -527,11 +554,11 @@ select:focus {
     padding: 2px;
     z-index: 999;
     transition: box-shadow 0.3s ease;
-    box-shadow: 0 0 700px -5px color-mix(in srgb, var(--player-color, var(--primary-dark)) 20%, transparent) /* Initial subtle glow */
+    box-shadow: 0 0 700px -5px color-mix(in srgb, var(--player-color, var(--primary-dark)) 60%, transparent) /* Initial subtle glow */
 }
 
 .player-message:hover {
-    box-shadow: 0 0 300px -5px color-mix(in srgb, var(--player-color, var(--primary-dark)) 40%, transparent) /* More intense on hover */
+    box-shadow: 0 0 300px -5px color-mix(in srgb, var(--player-color, var(--primary-dark)) 80%, transparent) /* More intense on hover */
 }
 
 .sender-name {
@@ -712,12 +739,7 @@ select:focus {
         z-index: 1000;
     }
 
-    .chat-header {
-        padding-left: 60px; /* Освобождаем место для кнопки меню */
-        position: sticky;
-        top: 0;
-        z-index: 1;
-    }
+    
 
     .menu-toggle#menuOpen {
         position: absolute;
