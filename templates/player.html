@@ -30,40 +30,44 @@
         <div class="menu-content">
             <!-- Character Tab -->
             <div id="characterTab" class="tab-content active">
-                <!-- Basic Info -->
+                <!-- Unified Character Info -->
                 <div class="menu-item">
                     <div class="menu-item-header">
-                        <span class="material-icons">person</span>
-                        <span>Basic Info</span>
+                        <span class="material-icons">account_circle</span>
+                        <span>Character Sheet</span>
                     </div>
                     <div class="menu-dropdown">
-                        <p><strong>Name:</strong> <span id="charName"></span></p>
-                        <p><strong>HP:</strong> <span id="charHP"></span></p>
-                        <p><strong>AC:</strong> <span id="charAC"></span></p>
-                        <p><strong>Gender:</strong> <span id="charGender"></span></p>
-                        <div id="charConditions">
-                            <strong>Conditions:</strong>
-                            <ul id="conditionsList"></ul>
+                        <div class="character-sheet">
+                            <div class="char-vitals">
+                                <h3 id="charName"></h3>
+                                <div class="hp-ac-row">
+                                    <div class="hp-display">
+                                        <span class="material-icons">favorite</span>
+                                        <span id="charHP"></span>
+                                    </div>
+                                    <div class="ac-display">
+                                        <span class="material-icons">shield</span>
+                                        <span id="charAC"></span>
+                                    </div>
+                                </div>
+                                <p><strong>Gender:</strong> <span id="charGender"></span></p>
+                            </div>
+                            <div class="stats-grid-main">
+                                <div class="stat-item-main"><strong>STR</strong><span id="charStr"></span></div>
+                                <div class="stat-item-main"><strong>DEX</strong><span id="charDex"></span></div>
+                                <div class="stat-item-main"><strong>CON</strong><span id="charCon"></span></div>
+                                <div class="stat-item-main"><strong>INT</strong><span id="charInt"></span></div>
+                                <div class="stat-item-main"><strong>WIS</strong><span id="charWis"></span></div>
+                                <div class="stat-item-main"><strong>CHA</strong><span id="charCha"></span></div>
+                            </div>
+                            <div id="charConditions">
+                                <strong>Conditions:</strong>
+                                <ul id="conditionsList"></ul>
+                            </div>
                         </div>
                     </div>
                 </div>
-                <!-- Stats -->
-                <div class="menu-item">
-                    <div class="menu-item-header">
-                        <span class="material-icons">shield</span>
-                        <span>Stats</span>
-                    </div>
-                    <div class="menu-dropdown">
-                        <div class="stats-grid">
-                            <p><strong>STR:</strong> <span id="charStr"></span></p>
-                            <p><strong>DEX:</strong> <span id="charDex"></span></p>
-                            <p><strong>CON:</strong> <span id="charCon"></span></p>
-                            <p><strong>INT:</strong> <span id="charInt"></span></p>
-                            <p><strong>WIS:</strong> <span id="charWis"></span></p>
-                            <p><strong>CHA:</strong> <span id="charCha"></span></p>
-                        </div>
-                    </div>
-                </div>
+
                 <!-- Appearance -->
                 <div class="menu-item">
                     <div class="menu-item-header">
@@ -71,6 +75,7 @@
                         <span>Appearance</span>
                     </div>
                     <div class="menu-dropdown">
+                        <img id="charImage" src="" alt="Character Image" style="width: 100%; height: auto; border-radius: 4px; margin-bottom: 10px;">
                         <p id="charAppearance"></p>
                         <p id="charClothing"></p>
                     </div>
@@ -124,6 +129,7 @@
                         <span>Scene</span>
                     </div>
                     <div class="menu-dropdown" id="sceneDropdown">
+                        <img id="sceneImage" src="" alt="Scene Image" style="width: 100%; height: auto; border-radius: 4px; margin-bottom: 10px;">
                         <div id="sceneInfo" class="scene-info-scroll">
                             <h3><span id="sceneName"></span></h3>
                             <p><strong>Description:</strong> <span id="sceneDescription"></span></p>

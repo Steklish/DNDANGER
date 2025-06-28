@@ -317,7 +317,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (el) el.textContent = text || 'N/A';
         };
 
-        // Basic Info
+        // Vitals
         setText('charName', character.name);
         setText('charHP', `${character.current_hp}/${character.max_hp}`);
         setText('charAC', character.ac);
@@ -338,6 +338,10 @@ document.addEventListener('DOMContentLoaded', function() {
         setText('charCha', character.charisma);
 
         // Appearance
+        const charImage = document.getElementById('charImage');
+        if (charImage) {
+            charImage.src = `/static/images/${character.name}.png`;
+        }
         setText('charAppearance', character.appearance);
         setText('charClothing', character.clothing_and_cosmetics);
 
@@ -417,6 +421,11 @@ document.addEventListener('DOMContentLoaded', function() {
             `).join('') || '<p>No objects in this scene.</p>';
         }
         
+        const sceneImage = document.getElementById('sceneImage');
+        if (sceneImage) {
+            sceneImage.src = `/static/images/${scene.name}.png`;
+        }
+
         const event = new CustomEvent('scene_changed', { detail: scene });
         document.dispatchEvent(event);
     }
@@ -453,9 +462,21 @@ document.addEventListener('DOMContentLoaded', function() {
         header.addEventListener('click', function() {
             const menuItem = this.parentElement;
             menuItem.classList.toggle('expanded');
+            const dropdown = menuItem.querySelector('.menu-dropdown');
+            if (menuItem.classList.contains('expanded')) {
+                dropdown.style.display = 'block';
+            } else {
+                dropdown.style.display = 'none';
+            }
         });
     });
 
+    // Default expand for character sheet
+    const characterSheet = document.querySelector('.menu-item');
+    if(characterSheet){
+        characterSheet.classList.add('expanded');
+        characterSheet.querySelector('.menu-dropdown').style.display = 'block';
+    }
     // Обработка переключения вкладок
     const tabLinks = document.querySelectorAll('.tab-link');
     const tabContents = document.querySelectorAll('.tab-content');
@@ -508,11 +529,11 @@ document.addEventListener('DOMContentLoaded', function() {
     refresh()
 
     document.addEventListener('scene_changed', (e) => {
-        loadBackgroundImageWithRetries(e.detail);
+        setBackgrountToChat(e.detail);
     });
     
     // Выполняем первоначальную загрузку данных
-    function loadBackgroundImageWithRetries(scene){
+    function setBackgrountToChat(scene){
         console.log("Changing chat bg",  scene.name);
         chatMessages.style.backgroundImage = `url('/static/images/${scene.name}.png')`
         // chatMessages.style.backgroundColor = "white"
