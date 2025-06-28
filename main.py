@@ -87,6 +87,7 @@ async def create_character(payload: CharacterCreatePayload):
     )
     new_char = game.generator.generate(Character, prompt, game.context, "Russian")
     new_char.is_player = True
+    game.chapter.image_generator.submit_generation_task(new_char.model_dump_json(), new_char.name)
     await game.add_player_character(new_char)
     return {"status": "ok", "character_name": new_char.name}
 

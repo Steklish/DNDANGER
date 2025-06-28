@@ -1066,15 +1066,6 @@ select:focus {
         .rarity-Artifact { color: var(--rarity-artifact); }
         .rarity-Unique { color: var(--rarity-unique); }
 
-        /* Стили для карточек предметов с редкостью */
-        .inventory-item .item-header .name.rarity-Common { }
-        .inventory-item .item-header .name.rarity-Uncommon { }
-        .inventory-item .item-header .name.rarity-Rare { }
-        .inventory-item .item-header .name.rarity-Very-Rare { }
-        .inventory-item .item-header .name.rarity-Legendary { }
-        .inventory-item .item-header .name.rarity-Artifact { }
-        .inventory-item .item-header .name.rarity-Unique { }
-
 .stats-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
@@ -1187,9 +1178,10 @@ select:focus {
     margin-bottom: 20px;
 }
 
-.card-section h3 {
-    color: var(--text-primary);
+.stats-container h3 {
+    color: var(--primary);
     margin-bottom: 10px;
+    text-align: center;
 }
 
 .card-textarea {
@@ -1280,12 +1272,13 @@ select:focus {
     padding: 10px;
     background-color: var(--bg-surface);
     border-radius: 6px;
+    border: solid 1px;
 }
 
 .stat-row label {
     font-weight: bold;
     color: var(--text-primary);
-    font-size: 1em; /* Ensure label and value are same size */
+    font-size: 1.2em; /* Increased font size */
 }
 
 .stat-control {
@@ -1295,7 +1288,6 @@ select:focus {
     gap: 15px; /* Increased gap */
 }
 
-/* Slider Styles */
 #message-container {
     margin-bottom: 15px;
     padding: 10px;
@@ -1317,40 +1309,6 @@ select:focus {
     display: block;
 }
 
-
-.stat-slider::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 18px;
-    height: 18px;
-    background: var(--primary);
-    cursor: pointer;
-    border-radius: 50%;
-    border: 3px solid var(--bg-card); /* Creates a "halo" effect */
-    box-shadow: 0 0 10px 0 color-mix(in srgb, var(--primary) 50%, transparent); /* Glow effect */
-    transition: background-color 0.2s, transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.stat-slider::-moz-range-thumb {
-    width: 18px;
-    height: 18px;
-    background: var(--primary);
-    cursor: pointer;
-    border-radius: 50%;
-    border: 3px solid var(--bg-card);
-    box-shadow: 0 0 10px 0 color-mix(in srgb, var(--primary) 50%, transparent);
-    transition: background-color 0.2s, transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.stat-slider:hover::-webkit-slider-thumb {
-    transform: scale(1.15);
-    box-shadow: 0 0 15px 3px color-mix(in srgb, var(--primary) 70%, transparent);
-}
-
-.stat-slider:hover::-moz-range-thumb {
-    transform: scale(1.15);
-    box-shadow: 0 0 15px 3px color-mix(in srgb, var(--primary) 70%, transparent);
-}
 
 
 
@@ -1384,7 +1342,6 @@ select:focus {
     color: var(--text-primary);
     font-size: 1.2em;
     font-weight: bold;
-    -moz-appearance: textfield; /* Firefox */
 }
 
 .stat-control input[type="number"]::-webkit-outer-spin-button,
@@ -1414,6 +1371,21 @@ select:focus {
     display: block; /* Override grid */
     overflow-y: auto; /* Allow vertical scrolling */
     height: auto;
+}
+
+@media (max-width: 768px) {
+    .character-creation-container {
+        grid-template-columns: 1fr; /* Switch to a single column layout */
+        padding: 20px; /* Reduce padding on smaller screens */
+    }
+
+    .character-creation-controls {
+        order: 2; /* Move controls below the preview card */
+    }
+
+    .character-card-preview {
+        order: 1;
+    }
 }
 
 .ability-details {

@@ -10,6 +10,8 @@ __pycache__/
 venv/
 env/
 ENV/
+images/
+static/images/
 
 # IDE specific files
 .vscode/

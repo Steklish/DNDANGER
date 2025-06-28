@@ -2,6 +2,7 @@ import json
 from math import e
 import random
 from tkinter import E
+from click import Option
 from dotenv import load_dotenv
 from rsa import verify
 from classifier import Classifier
@@ -15,6 +16,7 @@ from utils import *
 from global_defines import *
 import global_defines
 from models import *
+from imagen import ImageGenerator
 
 
 
@@ -36,13 +38,40 @@ class Chapter:
         self.prompter = Prompter()
         self.story_manager = story_manager
         self.event_log: List[Dict[str, Any]] = []
+        self.image_generator = ImageGenerator()
+        self.image_generator.start()
         self.generate_scene()
 
+    def generate_character(self, prompt : str, context : Optional[str]) -> Character:
+        """Used to generate a NEW character. 
+
+        Args:
+            prompt (str): prompt for character generation
+
+        Returns:
+            Character: generated character
+        """
+        new_character =  self.generator.generate(
+            pydantic_model=Character,
+            prompt=prompt,
+            context=context,
+            language=self.language
+        )
+        self.image_generator.submit_generation_task(new_character.model_dump_json(), new_character.name)
+        return new_character
+         
+    def add_character(self, character: Character):
+        self.characters.append(character)
+        self.turn_order.append(character.name)
+        
     def log_event(self, event_type: str, **kwargs):
         """Logs a game event to the event log."""
         self.event_log.append({"event": event_type, "details": kwargs})
     
     def shuffle_turns(self):
+        """
+        Used to set up turn order (using AI).
+        """
         prompt = f"""
 <ROLE>
 You are a D&D Turn Order Strategist. Your task is to analyze the current game situation and a list of characters to determine the most logical turn order for the upcoming round.
@@ -238,6 +267,7 @@ Your response must be ONLY the complete, updated JSON object for the character. 
         print(f"{INFO_COLOR} Difficulty: {scene_d.scene_difficulty}{Colors.RESET}") # type: ignore
         print(f"{INFO_COLOR} Description:{Colors.RESET} {self.scene.description}")
         self.log_event("scene_generated", scene_name=self.scene.name, description=self.scene.description, difficulty=scene_d.scene_difficulty) # type: ignore
+        self.image_generator.submit_generation_task(self.scene.description, self.scene.name)
 
 
     def setup_fight(self):
@@ -575,8 +605,8 @@ Provide your response as a single JSON object matching the `ClassifyInformationO
 
                     case ProactiveChangeType.ADD_CHARACTER:
                         try:
-                            new_character : Character = self.generator.generate(Character, change.description, self.context, "Russian") # type: ignore
-                            self.characters.append(new_character)
+                            new_character : Character = self.generate_character(change.description, self.context)
+                            self.add_character(new_character)
                             yield EventBuilder.alert(f"(narrative) A new character, {new_character.name}, appears: {change.description}")
                         except Exception as e:
                             yield EventBuilder.error(f"Error adding character: {e}")

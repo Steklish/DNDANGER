@@ -33,18 +33,17 @@ class Game:
         self.context = self.story_manager.get_current_plot_context()
 
         # Generate the initial NPC based on the campaign's starting prompt
-        initial_npc = self.generator.generate(
-            Character,
-            self.story_manager.story.initial_character_prompt,
-            self.context,
-            "Russian"
-        )
-
         self.chapter = Chapter(
             context=self.context,
             story_manager=self.story_manager,
-            characters=[initial_npc]
+            characters=[]
         )
+        initial_npc = self.chapter.generate_character(
+            self.story_manager.story.initial_character_prompt,
+            self.context
+        )
+        self.chapter.add_character(initial_npc)
+
         self.chapter.game_mode = GameMode.NARRATIVE
 
         # Announce the starting location and initial scene description
@@ -280,7 +279,7 @@ class Game:
         """
         Adds a new player character to the game.
         """
-        self.chapter.characters.append(character)
+        self.chapter.add_character(character)
         await self.announce(EventBuilder.player_joined(character.name, self.listener_names))
 
     def update_character(self, character_name: str, updates: dict):
