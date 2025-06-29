@@ -1,6 +1,4 @@
 # ANSI Color codes for terminal output
-from turtle import color
-
 
 class Colors:
     # Basic colors

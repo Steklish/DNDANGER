@@ -1,5 +1,4 @@
 import json
-from multiprocessing import allow_connection_pickling
 from chapter_logic import Chapter
 from classifier import Classifier
 from generator import ObjectGenerator

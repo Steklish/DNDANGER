@@ -7,16 +7,7 @@ from typing import Type, TypeVar, Optional
 from pydantic import BaseModel, ValidationError
 import google.generativeai as genai
 from dotenv import load_dotenv
-from global_defines import (
-    Colors, 
-    ERROR_COLOR, 
-    WARNING_COLOR, 
-    HEADER_COLOR,
-    ENTITY_COLOR,
-    SUCCESS_COLOR,
-    TIME_COLOR,
-    INFO_COLOR
-)
+from global_defines import *
 
 # Import the self-contained schemas from our separate file
 # Make sure you have your schemas.py file in a 'models' subfolder or adjust the import.

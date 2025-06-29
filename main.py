@@ -1,6 +1,4 @@
 import asyncio
-import logging
-import os
 import uuid
 import uvicorn
 from dotenv import load_dotenv
@@ -10,7 +8,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Streamin
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
-from global_defines import INFO_COLOR, Colors
+from global_defines import *
 from models.schemas import Character
 from game import Game
 
