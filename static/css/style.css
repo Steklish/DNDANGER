@@ -485,6 +485,7 @@ select:focus {
 }
 
 
+
 .chat-messages {
     flex: 1;
     padding: 16px;
@@ -493,18 +494,19 @@ select:focus {
     flex-direction: column;
     gap: 12px;
     position: relative;
-    background-size: cover;
     isolation: isolate; /* Create a new stacking context */
 }
 
-.chat-messages::before {
-    content: '';
+.chat-background {
     position: fixed;
-    top: 0; left: 0; right: 0; bottom: 0;
-    background-image: inherit; /* Inherit from the parent .chat-messages */
-    background-size: cover;
-    background-position: center;
-    z-index: -2; /* Place behind the overlay */
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    z-index: -2;
 }
 
 .chat-messages::after {
@@ -512,7 +514,7 @@ select:focus {
     position: fixed;
     top: 0; left: 0; right: 0; bottom: 0;
     background-color: rgba(0, 0, 0, 0.7);
-    backdrop-filter: blur(8px);
+    backdrop-filter: blur(4px);
     filter: saturate(60%);
     -webkit-backdrop-filter: blur(8px); /* For Safari */
     z-index: -1; /* Place between the background and content */
@@ -836,6 +838,19 @@ select:focus {
         button.admin-button:hover {
             background-color: var(--bg-card);
             color: var(--text-primary);
+        }
+
+        .btn-create-char {
+            background-color: var(--primary-dark);
+            color: var(--primary);
+            border: 1px solid var(--primary);
+            transition: all 0.3s ease;
+        }
+
+        .btn-create-char:hover {
+            background-color: var(--primary);
+            color: var(--bg-dark);
+            box-shadow: 0 0 300px color-mix(in srgb, var(--primary) 25%, transparent);
         }        .header {
             background-color: var(--bg-card);
             padding: 10px 20px;
@@ -1165,6 +1180,31 @@ select:focus {
     flex-wrap: wrap;
     gap: 8px;
     margin-top: 5px;
+}
+
+.turn-item {
+    display: flex;
+    align-items: center;
+    padding: 8px;
+    margin-bottom: 5px;
+    border-radius: 4px;
+    background-color: var(--bg-surface);
+    border-left: 4px solid transparent;
+    transition: all 0.3s ease;
+}
+
+.turn-item.active {
+    border-left-color: var(--primary);
+    background-color: var(--primary-dark);
+    font-weight: bold;
+}
+
+.turn-char-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    margin-right: 10px;
+    object-fit: cover;
 }
 .stats-grid {
     display: grid;

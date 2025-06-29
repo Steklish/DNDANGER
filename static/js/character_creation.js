@@ -68,10 +68,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    const showMessage = (message, type = 'info') => {
-        messageContainer.textContent = message;
-        messageContainer.className = `message ${type}`;
-    };
+    
 
     sliders.forEach(slider => {
         slider.addEventListener('input', (e) => {
@@ -99,11 +96,11 @@ document.addEventListener('DOMContentLoaded', () => {
         btnText.style.display = 'none';
         btnLoader.style.display = 'inline';
         loadingContainer.style.display = 'flex';
-        showMessage('Отправка запроса...', 'info');
+        showNotification('Отправка запроса...', 'info');
 
         const pointsSpent = calculatePointsSpent();
         if (pointsSpent > initialPoints) {
-            showMessage("Вы израсходовали слишком много очков!", 'error');
+            showNotification("Вы израсходовали слишком много очков!", 'error');
             createCharacterBtn.disabled = false;
             btnText.style.display = 'inline';
             btnLoader.style.display = 'none';
@@ -128,17 +125,17 @@ document.addEventListener('DOMContentLoaded', () => {
             const responseData = await response.json();
 
             if (response.ok) {
-                showMessage('Персонаж успешно создан! Перенаправление...', 'success');
+                showNotification('Персонаж успешно создан! Перенаправление...', 'success');
                 setTimeout(() => { window.location.href = '/'; }, 2000);
             } else {
-                showMessage(`Ошибка: ${responseData.detail}`, 'error');
+                showNotification(`Ошибка: ${responseData.detail}`, 'error');
                 createCharacterBtn.disabled = false;
                 btnText.style.display = 'inline';
                 btnLoader.style.display = 'none';
             }
         } catch (error) {
             console.error('Failed to create character:', error);
-            showMessage('Произошла непредвиденная ошибка. Пожалуйста, попробуйте снова.', 'error');
+            showNotification('Произошла непредвиденная ошибка. Пожалуйста, попробуйте снова.', 'error');
             createCharacterBtn.disabled = false;
             btnText.style.display = 'inline';
             btnLoader.style.display = 'none';

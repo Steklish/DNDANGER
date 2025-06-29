@@ -1,4 +1,6 @@
 import asyncio
+import logging
+import os
 import uuid
 import uvicorn
 from dotenv import load_dotenv
@@ -11,6 +13,20 @@ from pydantic import BaseModel
 from global_defines import INFO_COLOR, Colors
 from models.schemas import Character
 from game import Game
+
+
+os.makedirs('/log', exist_ok=True)
+# Remove all handlers associated with the root logger
+for handler in logging.root.handlers[:]:
+    logging.root.removeHandler(handler)
+
+# Configure logging to write to /log/app.log
+logging.basicConfig(
+    filename='/log/app.log',
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+
 
 # --- FastAPI Setup ---
 load_dotenv()
@@ -100,6 +116,7 @@ async def get_game_state():
         "characters": [p.model_dump() for p in game.chapter.characters],
         "chat_history": game.message_history,
         "game_mode": game.chapter.game_mode.name,
+        "turn_order": [p for p in game.chapter.turn_order],
         "story": {
             "title": story_manager.story.title,
             "main_goal": story_manager.story.main_goal,
@@ -146,7 +163,7 @@ async def update_character_api(payload: CharacterUpdatePayload):
 
 @app.delete('/api/character/{character_name}')
 async def delete_character_api(character_name: str):
-    if game.delete_character(character_name):
+    if await game.delete_character(character_name):
         return JSONResponse(content={"status": "ok"})
     raise HTTPException(status_code=404, detail="Character not found")
 

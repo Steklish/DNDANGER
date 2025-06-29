@@ -1,15 +1,15 @@
+from typing import TYPE_CHECKING
+
+from server_communication.events import EventBuilder
+if TYPE_CHECKING:
+    from game import Game
+    
+
 import json
-from math import e
-import random
-from tkinter import E
-from click import Option
 from dotenv import load_dotenv
-from rsa import verify
-from classifier import Classifier
 from generator import ObjectGenerator
 from models.game_modes import GameMode
 from models import *
-from prompter import Prompter
 from server_communication.events import EventBuilder
 from story_manager import StoryManager
 from utils import *
@@ -17,14 +17,16 @@ from global_defines import *
 import global_defines
 from models import *
 from imagen import ImageGenerator
-
+from classifier import Classifier
+from prompter import Prompter
+from imagen import ImageGenerator
 
 
 class Chapter:
     """Fight logic for a chapter in a game, handling character interactions and actions."""
 
     
-    def __init__(self, context: str, story_manager: StoryManager, characters: List[Character] = [], language: str = "Russian"):
+    def __init__(self, context: str, story_manager: StoryManager, game : 'Game', characters: List[Character] = [], language: str = "Russian"):
         self.context = context
         self.last_scene = context
         self.characters = characters        
@@ -38,7 +40,7 @@ class Chapter:
         self.prompter = Prompter()
         self.story_manager = story_manager
         self.event_log: List[Dict[str, Any]] = []
-        self.image_generator = ImageGenerator()
+        self.image_generator = ImageGenerator(game)
         self.image_generator.start()
         self.generate_scene()
 
@@ -133,9 +135,9 @@ Based on the context and heuristics, generate a JSON object that conforms to the
                 language=self.language
             )
             
-            update_log = f"<SCENE_UPDATE>\n<NAME>{scene_name}</NAME>\n<CHANGES>{changes_to_make}</CHANGES>\n<ORIGINAL_STATE>{original_scene_json}</ORIGINAL_STATE>\n<NEW_STATE>{self.scene.model_dump_json(indent=2)}</NEW_STATE>\n</SCENE_UPDATE>"
+            update_log = f"<SCENE_UPDATE>\n<NAME>{scene_name}</NAME>\n<CHANGES>{changes_to_make}</CHANGES>\n</SCENE_UPDATE>"
             self.context += f"\n{update_log}\n"
-            self.log_event("scene_update_success", scene_name=scene_name, new_scene=self.scene.model_dump())
+            self.log_event("scene_update_success", scene_name=scene_name, changes=changes_to_make)
             
             print(f"{SUCCESS_COLOR} Scene updated successfully!{Colors.RESET}")
         except Exception as e:
@@ -206,9 +208,9 @@ Your response must be ONLY the complete, updated JSON object for the character. 
             )
             self.characters.append(updated_character)
             
-            update_log = f"<CHARACTER_UPDATE>\n<NAME>{character_name}</NAME>\n<CHANGES>{changes_to_make}</CHANGES>\n<RESULT>{updated_character.model_dump_json(indent=2)}</RESULT>\n</CHARACTER_UPDATE>"
+            update_log = f"<CHARACTER_UPDATE>\n<NAME>{character_name}</NAME>\n<CHANGES>{changes_to_make}</CHANGES>\n</CHARACTER_UPDATE>"
             self.context += f"\n{update_log}\n"
-            self.log_event("character_update_success", character_name=character_name, updated_character=updated_character.model_dump())
+            self.log_event("character_update_success", character_name=character_name, changes=changes_to_make)
             
             print(f"{SUCCESS_COLOR} Character '{updated_character.name}' updated successfully!{Colors.RESET}")
             
@@ -267,7 +269,7 @@ Your response must be ONLY the complete, updated JSON object for the character. 
         print(f"{INFO_COLOR} Difficulty: {scene_d.scene_difficulty}{Colors.RESET}") # type: ignore
         print(f"{INFO_COLOR} Description:{Colors.RESET} {self.scene.description}")
         self.log_event("scene_generated", scene_name=self.scene.name, description=self.scene.description, difficulty=scene_d.scene_difficulty) # type: ignore
-        self.image_generator.submit_generation_task(self.scene.description, self.scene.name)
+        self.image_generator.submit_generation_task(self.scene.description , self.scene.name)
 
 
     def setup_fight(self):
@@ -363,7 +365,8 @@ Your response must be ONLY the complete, updated JSON object for the character. 
 
         narrative = outcome.narrative_description
         changes = outcome.structural_changes
-        self.log_event("action_outcome", character_name=character.name, narrative=narrative, changes=changes, is_legal=outcome.is_legal)
+        changes_as_dicts = [change.model_dump() for change in changes]
+        self.log_event("action_outcome", character_name=character.name, narrative=narrative, changes=changes_as_dicts, is_legal=outcome.is_legal)
 
         # The rest of the a
         action_summary = f"Action by {character.name}: '{action_text}'. Outcome: {narrative}"
@@ -454,14 +457,17 @@ Your response must be ONLY the complete, updated JSON object for the character. 
 </FULL_CONTEXT>
 
 <TASK>
+<TASK>
 Создай новую сводку (не более {MAX_CONTEXT_LENGTH} слов), которая сохраняет только самую важную информацию для предстоящей сцены. Обязательно включи в нее:
-1.  **Основная цель:** Какова главная цель группы авантюристов в данный момент?
-2.  **Основная цель врагов:** Какова главная цель их противников?
-3.  **Ключевые отношения:** Какие союзы или конфликты существуют между персонажами?
-4.  **Важные детали прошлого:** Упомяни 1-2 самых важных события из прошлого, которые напрямую влияют на текущую мотивацию персонажей.
-5.  **Намерение DM:** Если в тексте есть намеки на будущие события или секреты от Мастера, сохрани их.
+1.  **Расположение персонажей:** Проанализируй и кратко опиши, где находятся все персонажи в текущей сцене.
+2.  **Основная цель:** Какова главная цель группы авантюристов в данный момент?
+3.  **Основная цель врагов:** Какова главная цель их противников?
+4.  **Ключевые отношения:** Какие союзы или конфликты существуют между персонажами?
+5.  **Важные детали прошлого:** Упомяни 1-2 самых важных события из прошлого, которые напрямую влияют на текущую мотивацию персонажей.
+6.  **Намерение DM:** Если в тексте есть намеки на будущие события или секреты от Ма��тера, сохрани их.
 
 Не включай в сводку нерелевантные детали или описания уже прошедших действий, если они не влияют на будущее.
+</TASK>
 </TASK>
 """
         )
@@ -561,20 +567,17 @@ Provide your response as a single JSON object matching the `ClassifyInformationO
         if self.game_mode != analisys.recommended_mode:
             self.game_mode = analisys.recommended_mode
             yield EventBuilder.alert(f'Game mode changed to <span class="keyword">{self.game_mode.name}</span>')
-        if self.game_mode == GameMode.NARRATIVE:
-            async for event in self.after_narrative(): # type: ignore
-                yield event
         yield EventBuilder.end_of_turn()
     
     async def after_turn(self):
         print(f"\n{INFO_COLOR} Processing after-turn effects...{Colors.YELLOW} {len(self.context)} chars of context {Colors.RESET}") # type: ignore
+        if self.game_mode == GameMode.NARRATIVE:
+            async for event in self.after_narrative(): # type: ignore
+                yield event
         if len(self.context) > MAX_CONTEXT_LENGTH_CHARS:  # type: ignore
             self.trim_context()
             if self.context: 
                 print(f"{SUCCESS_COLOR} Context updated{Colors.RESET}")
-        if self.game_mode == GameMode.NARRATIVE:
-            async for event in self.after_narrative(): # type: ignore
-                yield event
 
     async def after_narrative(self):
         analisys : NarrativeTurnAnalysis = self.generator.generate(
@@ -638,7 +641,7 @@ Provide your response as a single JSON object matching the `ClassifyInformationO
                             if not isinstance(payload, NextScene):
                                 raise TypeError(f"CHANGE_SCENE payload must be a NextScene object, but got {type(payload)}")
                             self.generate_scene(payload)
-                            yield EventBuilder.alert(f"Scene changed: {change.description}")
+                            # yield EventBuilder.scene_change(change.description)
                         except Exception as e:
                             yield EventBuilder.error(f"Error changing scene: {e}")
                             print(f"{ERROR_COLOR}Error in CHANGE_SCENE: {e}{Colors.RESET}")
@@ -692,36 +695,3 @@ Provide your response as a single JSON object matching the `ClassifyInformationO
         async for value in self.action(self.get_active_character(), NPC_action, is_NPC=True):
             yield value
         
-if __name__ == "__main__":
-    load_dotenv()
-
-    # Setup the story
-    story_manager = StoryManager("campaigns/campaign.json")
-    
-    # enemy turn test
-    generator = ObjectGenerator()
-    context = "A ground beneeth the grand tree"
-    print(f"{HEADER_COLOR}🎮 Starting new chapter (enemy turn test)...{Colors.RESET}")
-    chapter = Chapter(
-        context = context,
-        story_manager=story_manager,
-        characters = [
-            generator.generate(Character, "Борис Бритва with full hp (50 hp) and a single dager (player character)", context, "Russian"),
-            generator.generate(Character, "random monster with full hp (50 hp) and some magic spells (enemy NPC)", context, "Russian")
-        ]
-    )
-    chapter.setup_fight()
-    # def print_game_sate():
-    #     for c in chapter.characters:
-    #         print(c.model_dump_json(indent=2))
-    #     print(chapter.scene.model_dump_json(indent=2)) # type: ignore
-    #     print(chapter.turn_order)
-    # while True:
-    #     if chapter.get_active_character().is_player:
-    #         user_input = input(f"{ENTITY_COLOR}{chapter.get_active_character_name()} -->{Colors.RESET}  ")
-    #         if user_input == "?": 
-    #             print_game_sate()
-    #             continue
-    #         chapter.process_interaction(chapter.get_active_character(), user_input) # type: ignore
-    #     else:
-    #         dm_action = chapter.NPC_turn()

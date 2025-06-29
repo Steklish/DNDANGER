@@ -12,6 +12,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const menuItems = document.querySelectorAll('.menu-item');
     const character_name = document.getElementById('character_name').innerHTML;
     const playerWaitLoading = document.getElementById('player_wait_loading');
+
+    const backgroundEtags = {};
     playerWaitLoading.style.display = "none"
     // Получаем имя игрока из localStorage (установленное при логине)
     const currentPlayerName = localStorage.getItem('playerName');
@@ -60,9 +62,19 @@ document.addEventListener('DOMContentLoaded', function() {
                     "system"
                 );
                 break;
-            // case "player_joined":
-            //     showNotification(`Player [${data.data}] joined the room`)
-            //     break;
+
+
+            case "scene_change":
+                addMessage(
+                    data.data,
+                    "system"
+                )
+                break;
+            
+            case "scene_change":
+                showNotification(`Scene updated ${data.new_scene_name}`)
+                updateBackground(data.new_scene_name)
+                break;
                 
             // case "player_left":
             //     showNotification(`Player [${data.data}] left the room`)
@@ -75,7 +87,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 } else {
                     if (data.game_mode != "NARRATIVE"){
                         lock_input(data.allowed_players.length !== 0);
-                    } 
+                    }
+                    else if (data.lock_all == true) {
+                        lock_input(data.allowed_players.length !== 0);
+                    }
+
                 }
                 if (data.game_mode == "NARRATIVE" && data.lock_all == false){
                     unlock_input();
@@ -106,6 +122,13 @@ document.addEventListener('DOMContentLoaded', function() {
             console.error('Error processing update:', error);
         }
     };
+
+    function updateBackground(filename) {
+        console.log("Changing chat bg", filename);
+        // Add a cache-busting query parameter (timestamp)
+        const cacheBuster = Date.now();
+        chatMessages.style.backgroundImage = `url('/static/images/${filename}?cb=${cacheBuster}')`;
+    }
 
     // Обработка ошибок подключения
     eventSource.onopen = () => console.log("SSE connection opened");
@@ -170,10 +193,15 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
         if (data.scene) {
+            scene = data.scene;
             updateSceneInfo(data.scene);
+            updateBackgroundIfNeeded(data.scene);
         }
         if (data.chat_history) {
             updateChat(data.chat_history);
+        }
+        if (data.turn_order) {
+            updateTurnOrder(data.turn_order, data.characters);
         }
     }
 
@@ -309,6 +337,22 @@ document.addEventListener('DOMContentLoaded', function() {
         // }
     }
 
+    function updateTurnOrder(turnOrder, characters) {
+        const turnOrderList = document.getElementById('turnOrderList');
+        if (turnOrderList) {
+            turnOrderList.innerHTML = turnOrder.map(name => {
+                const character = characters.find(c => c.name === name);
+                const isActive = character && character.name === window.character_name;
+                return `
+                    <div class="turn-item ${isActive ? 'active' : ''}">
+                        <img src="/static/images/${name}.png" class="turn-char-icon" alt="${name}">
+                        <span>${name}</span>
+                    </div>
+                `;
+            }).join('') || '<li>No combatants</li>';
+        }
+    }
+
     // Функция обновления информации о персонаже
     function updateCharacterInfo(character) {
         // Helper to safely update text content
@@ -430,6 +474,7 @@ document.addEventListener('DOMContentLoaded', function() {
         document.dispatchEvent(event);
     }
 
+
     // Открытие бокового меню
     menuOpen.addEventListener('click', function(e) {
         e.stopPropagation();
@@ -524,18 +569,7 @@ document.addEventListener('DOMContentLoaded', function() {
             .catch(error => {
                 console.error('Error fetching initial data:', error);
             });
-        }
+    }
         
     refresh()
-
-    document.addEventListener('scene_changed', (e) => {
-        setBackgrountToChat(e.detail);
-    });
-    
-    // Выполняем первоначальную загрузку данных
-    function setBackgrountToChat(scene){
-        console.log("Changing chat bg",  scene.name);
-        chatMessages.style.backgroundImage = `url('/static/images/${scene.name}.png')`
-        // chatMessages.style.backgroundColor = "white"
-    }
 });

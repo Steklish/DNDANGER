@@ -12,6 +12,7 @@ env/
 ENV/
 images/
 static/images/
+log/
 
 # IDE specific files
 .vscode/

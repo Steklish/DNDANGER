@@ -36,7 +36,8 @@ class Game:
         self.chapter = Chapter(
             context=self.context,
             story_manager=self.story_manager,
-            characters=[]
+            characters=[],
+            game=self
         )
         initial_npc = self.chapter.generate_character(
             self.story_manager.story.initial_character_prompt,

@@ -164,3 +164,12 @@ class EventBuilder:
             "event": "end_of_turn",
             "sender": "server"
         }
+        
+    @staticmethod
+    def scene_change(info:str, scene_name:str):
+        return {
+            "event": "scene_change",
+            "data": info,
+            "sender": "server", 
+            "new_scene_name" : scene_name
+        }

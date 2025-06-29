@@ -1,4 +1,9 @@
-import base64
+from typing import TYPE_CHECKING
+
+from server_communication.events import EventBuilder
+if TYPE_CHECKING:
+    from game import Game
+    
 import mimetypes
 import os
 import time
@@ -7,11 +12,12 @@ import threading
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
-from librosa import ex
 from global_defines import *
 
+PROMPT_PREVIEW_LENGTH = 10
+
 class ImageGenerator:
-    def __init__(self):
+    def __init__(self, game : 'Game'):
         self.client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
         self.model = "gemini-2.0-flash-preview-image-generation"
         self.image_dir = os.path.join("static", "images")
@@ -21,26 +27,28 @@ class ImageGenerator:
         self.task_queue = queue.Queue()
         self.worker_thread = None
         self.stop_event = threading.Event()
+        self.game = game
 
-    def _worker(self):
+
+    async def _worker(self):
         while not self.stop_event.is_set():
             try:
                 # Wait for a task, with a timeout to allow checking the stop_event
                 prompt, file_name = self.task_queue.get(timeout=1)
-                self._perform_generation(prompt, file_name)
+                await self._perform_generation(prompt, file_name)
                 self.task_queue.task_done()
             except queue.Empty:
                 continue
             except Exception as e:
                 print(f"{ERROR_COLOR}Error in image generation worker: {e}{Colors.RESET}")
 
-    def _perform_generation(self, prompt: str, file_name: str):
+    async def _perform_generation(self, prompt: str, file_name: str, type : str = "CHARACTER"):
         """
         Generates an image based on the given prompt and saves it to a file.
         """
-        print(f"{INFO_COLOR}(IMAGEN){Colors.RESET} Starting generation for prompt: {prompt}")
+        print(f"{INFO_COLOR}(IMAGEN){Colors.RESET} Starting generation for prompt: {prompt[:PROMPT_PREVIEW_LENGTH] + '...' if len(prompt) > PROMPT_PREVIEW_LENGTH else prompt}")
         start_time = time.monotonic()
-        prompt += "Generate an imge in a dark fantasy highly realistic style"
+        prompt += "Generate an imge in a dark fantasy highly realistic style. Use square proportions for the image."
         try:
             contents = [
                 types.Content(
@@ -76,6 +84,8 @@ class ImageGenerator:
                             end_time = time.monotonic()
                             print(f"{TIME_COLOR}Image generation took {end_time - start_time:.2f} seconds.{Colors.RESET}")
                             print(f"{SUCCESS_COLOR}File saved to: {image_path}{Colors.RESET}")
+                            if type == "SCENE":
+                                await self.game.announce(EventBuilder.scene_change("scene_changed", f"{file_name}{file_extension}"))            
                             return
             
             print(f"{WARNING_COLOR}Image generation finished but no image data was returned.{Colors.RESET}")
@@ -87,7 +97,7 @@ class ImageGenerator:
         """
         Submits a task to the generation queue. Does not block.
         """
-        print(f"{INFO_COLOR}(IMAGEN){Colors.RESET} Submitting task for prompt: {prompt}")
+        print(f"{INFO_COLOR}(IMAGEN){Colors.RESET} Submitting task for prompt: {prompt[:PROMPT_PREVIEW_LENGTH] + '...' if len(prompt) > PROMPT_PREVIEW_LENGTH else prompt}")
         self.task_queue.put((prompt, file_name))
 
     def start(self):
@@ -108,41 +118,3 @@ class ImageGenerator:
         if self.worker_thread and self.worker_thread.is_alive():
             self.worker_thread.join() # Wait for the thread to terminate
         print(f"{SUCCESS_COLOR}(IMAGEN) Worker thread stopped.{Colors.RESET}")
-
-
-if __name__ == '__main__':
-    load_dotenv()
-    if not os.environ.get("GEMINI_API_KEY"):
-        print(f"{ERROR_COLOR}Please set the GEMINI_API_KEY environment variable to run this test.{Colors.RESET}")
-    else:
-        print(f"{HEADER_COLOR}--- Testing Asynchronous Image Generation ---{Colors.RESET}")
-        
-        generator = ImageGenerator()
-        generator.start()
-        
-        # --- Submit Tasks ---
-        print("\nSubmitting tasks (this should be non-blocking)...")
-        generator.submit_generation_task("A futuristic city with flying cars and neon signs.", "future_city")
-        print("Task 1 submitted.")
-        generator.submit_generation_task("A tranquil Japanese garden with a koi pond and a stone lantern.", "zen_garden")
-        print("Task 2 submitted.")
-        generator.submit_generation_task("A fierce Viking warrior with a horned helmet and a battle axe.", "viking_warrior")
-        print("Task 3 submitted.")
-        
-        print("\nMain thread continues execution while images are generated in the background...")
-        time.sleep(2) # Simulate other work
-        print("Main thread is still alive and well.\n")
-        
-        # --- Stop the Worker ---
-        # The 'stop' method will wait for the queue to be empty before shutting down.
-        generator.stop()
-        
-        print(f"\n{HEADER_COLOR}--- Test Complete ---{Colors.RESET}")
-        # Verify files were created
-        for name in ["future_city", "zen_garden", "viking_warrior"]:
-            path = os.path.join(generator.image_dir, f"{name}.png")
-            if os.path.exists(path):
-                print(f"{SUCCESS_COLOR}Verified: {path} exists.{Colors.RESET}")
-            else:
-                print(f"{ERROR_COLOR}Verification Failed: {path} does not exist.{Colors.RESET}")
-
