@@ -15,19 +15,6 @@ from models.schemas import Character
 from game import Game
 
 
-os.makedirs('/log', exist_ok=True)
-# Remove all handlers associated with the root logger
-for handler in logging.root.handlers[:]:
-    logging.root.removeHandler(handler)
-
-# Configure logging to write to /log/app.log
-logging.basicConfig(
-    filename='/log/app.log',
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
-
-
 # --- FastAPI Setup ---
 load_dotenv()
 app = FastAPI()

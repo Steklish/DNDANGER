@@ -63,14 +63,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 );
                 break;
 
-
-            case "scene_change":
-                addMessage(
-                    data.data,
-                    "system"
-                )
-                break;
-            
             case "scene_change":
                 showNotification(`Scene updated ${data.new_scene_name}`)
                 updateBackground(data.new_scene_name)
@@ -195,7 +187,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (data.scene) {
             scene = data.scene;
             updateSceneInfo(data.scene);
-            updateBackgroundIfNeeded(data.scene);
+            updateBackground(`${data.scene.name}.png`)
         }
         if (data.chat_history) {
             updateChat(data.chat_history);

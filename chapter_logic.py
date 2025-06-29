@@ -269,7 +269,7 @@ Your response must be ONLY the complete, updated JSON object for the character. 
         print(f"{INFO_COLOR} Difficulty: {scene_d.scene_difficulty}{Colors.RESET}") # type: ignore
         print(f"{INFO_COLOR} Description:{Colors.RESET} {self.scene.description}")
         self.log_event("scene_generated", scene_name=self.scene.name, description=self.scene.description, difficulty=scene_d.scene_difficulty) # type: ignore
-        self.image_generator.submit_generation_task(self.scene.description , self.scene.name)
+        self.image_generator.submit_generation_task(self.scene.description , self.scene.name, generation_type="SCENE")
 
 
     def setup_fight(self):
@@ -328,9 +328,13 @@ Your response must be ONLY the complete, updated JSON object for the character. 
                 char_data['is_currently_acting'] = False
             all_characters_data.append(char_data)
 
+        # NEW: Include the last 10 events for short-term memory
+        recent_events = self.event_log[-10:]
+
         context_dict = {
             "game_state": {
                 "summary_of_past_events": self.context,
+                "recent_events": recent_events,  # <-- ADDED
                 "current_scene": self.scene.model_dump() if self.scene else "No scene is currently active.",
                 "participants": {
                     "description": "A list of all characters currently in the scene.",
@@ -464,7 +468,7 @@ Your response must be ONLY the complete, updated JSON object for the character. 
 3.  **Основная цель врагов:** Какова главная цель их противников?
 4.  **Ключевые отношения:** Какие союзы или конфликты существуют между персонажами?
 5.  **Важные детали прошлого:** Упомяни 1-2 самых важных события из прошлого, которые напрямую влияют на текущую мотивацию персонажей.
-6.  **Намерение DM:** Если в тексте есть намеки на будущие события или секреты от Ма��тера, сохрани их.
+6.  **Намерение DM:** Если в тексте есть намеки на будущие события или секреты от Мастера, сохрани их.
 
 Не включай в сводку нерелевантные детали или описания уже прошедших действий, если они не влияют на будущее.
 </TASK>
@@ -481,42 +485,40 @@ Your response must be ONLY the complete, updated JSON object for the character. 
         """
         if not character.is_alive:
             return self.askedDM(character, interaction), False
+
+        # Get the full game context to help the AI make a better decision
+        context = self.get_actual_context(active_character_name=character.name)
+
         decision: ClassifyInformationOrActionRequest = self.classifier.generate(
-    contents=f"""
+            contents=f"""
 <ROLE>
-You are an intelligent request router for a D&D game. Your task is to analyze a player's request and classify it into one of two categories: an in-game character action OR a meta-question to the Dungeon Master.
+You are an intelligent request router for a D&D game. Your task is to analyze a player's request in the context of recent events and classify it as either an in-game character action OR a meta-question to the Dungeon Master.
 </ROLE>
 
 <TASK_DEFINITION>
-Analyze the player's request provided below. Your goal is to determine if the player is speaking **AS THEIR CHARACTER** to perform an action in the game world, or if the player is speaking **AS A PLAYER** to the Dungeon Master (DM) to ask a question or clarify rules.
-
-To make the right choice, ask yourself this key question: **"Is this something the character DOES, or something the player ASKS?"**
+Analyze the player's request below, using the provided game context. Your goal is to determine if the player is speaking **AS THEIR CHARACTER** (performing an action) or **AS A PLAYER** (asking a question to the DM).
 </TASK_DEFINITION>
 
+<CONTEXT_AWARENESS_RULE>
+**CRITICAL:** You MUST use the `<CONTEXT_FOR_DECISION>` to understand the flow of conversation. A player's message might look like a question out of context, but be a direct reply to an NPC in the context of the recent events.
+
+*   **Example:** If an NPC just asked the player, "Do you yield?", the player's response "Do you know who I am?" is a **Character Action** (a defiant, in-character response), NOT a question to the DM.
+</CONTEXT_AWARENESS_RULE>
+
 <CATEGORY_DEFINITIONS>
-You must classify the request into one of these two categories, which correspond to a boolean value in the `decision` field.
+1.  **Действие Персонажа (Character Action) -> `decision: false`**
+    *   The player describes what their character is doing, saying, or attempting within the game world.
+    *   This includes direct replies to NPCs, even if phrased as a question.
+    *   **Keywords:** "Я атакую", "Я иду", "Я говорю ему", "Я осматриваю комнату".
 
-**1. Действие Персонажа (Character Action) -> `decision: false`**
-   - This is when the player describes what their character is doing, attempting, or saying *within the game world*.
-   - These are commands for the character to interact with the environment, other characters, or items.
-   - **Keywords:** "Я атакую", "Я иду", "Я пытаюсь взломать", "Я говорю ему", "Я использую зелье".
-   - **IMPORTANT:** Actions that gather information *through a character's senses or skills* are still ACTIONS. For example, "Я осматриваю комнату" or "Я пытаюсь понять, лжет ли он" are actions that would require a Perception or Insight check. They are NOT questions to the DM.
-
-**2. Запрос к Мастеру (Query to the DM) -> `decision: true`**
-   - This is when the player asks a question directly to the Dungeon Master about the world, rules, or their character's state. It is a meta-request for information, not an in-world action.
-   - **Keywords:** "Что я вижу?", "Могу ли я...?", "Расскажи подробнее о...", "Какие у меня есть предметы?", "Что произойдет, если...?", "OOC (Out of Character)".
-   - This category is for clarifying information that the player needs to decide on an action.
-
+2.  **Запрос к Мастеру (Query to the DM) -> `decision: true`**
+    *   The player asks a question directly to the Dungeon Master about rules, the world, or their character's state. This is a meta-request for information.
+    *   **Keywords:** "Что я вижу?", "Могу ли я...?", "Расскажи подробнее о...", "OOC".
 </CATEGORY_DEFINITIONS>
 
-<EXAMPLES>
-- Запрос: "Я атакую гоблина своим длинным мечом." -> `decision: false` (Пояснение: Четкое действие персонажа).
-- Запрос: "Расскажи мне, как выглядит этот гоблин?" -> `decision: true` (Пояснение: Запрос информации к Мастеру).
-- Запрос: "Я внимательно осматриваюсь в поисках ловушек." -> `decision: false` (Пояснение: Это действие, требующее проверки навыка Внимания, а не просто вопрос).
-- Запрос: "Могу ли я допрыгнуть до того уступа?" -> `decision: true` (Пояснение: Вопрос к Мастеру о правилах и возможностях, предшествующий действию).
-- Запрос: "Я хочу убедить стражника пропустить меня." -> `decision: false` (Пояснение: Заявка на социальное действие, требующее проверки Харизмы).
-- Запрос: "OOC: мне нужно отойти на пару минут." -> `decision: true` (Пояснение: Мета-комментарий, не относящийся к игровому миру).
-</EXAMPLES>
+<CONTEXT_FOR_DECISION>
+{self.get_actual_context()}
+</CONTEXT_FOR_DECISION>
 
 <PLAYER_REQUEST_TO_CLASSIFY>
 {interaction}
@@ -526,8 +528,8 @@ You must classify the request into one of these two categories, which correspond
 Provide your response as a single JSON object matching the `ClassifyInformationOrActionRequest` model, with no other text.
 </OUTPUT_INSTRUCTIONS>
 """,
-    pydantic_model=ClassifyInformationOrActionRequest
-)  # type: ignore
+            pydantic_model=ClassifyInformationOrActionRequest
+        )  # type: ignore
         if decision.decision: # type: ignore
             print(f"{INFO_COLOR}Request for info {Colors.RESET}")
             return self.askedDM(character, interaction), False
@@ -667,8 +669,8 @@ Provide your response as a single JSON object matching the `ClassifyInformationO
         
         NPC_action_prompt = f"""
 <ROLE>
-Ты — искусственный интеллект, управляющий неигровым персонажем (NPC) в бою.
-Твоя задача — выбрать наиболее логичное и эффективное действие для этого NPC на его ходу.
+Ты — тактический ИИ, управляющий неигровым персонажем (NPC) в бою в D&D.
+Твоя задача — выбрать наиболее логичное, тактически верное и соответствующее характеру действие для этого NPC на его ходу.
 </ROLE>
 
 <CHARACTER_PROFILE>
@@ -679,15 +681,41 @@ Provide your response as a single JSON object matching the `ClassifyInformationO
 {context_with_active_char}
 </SITUATION_CONTEXT>
 
+<TACTICAL_HEURISTICS>
+Проанализируй ситуацию и выбери действие, основываясь на следующих приоритетах:
+
+1.  **Самосохранение (Высший приоритет):**
+    *   Если у NPC **мало здоровья** (`current_hp` < 25% от `max_hp`), его главный приоритет — выживание.
+    *   **Действия:** Использовать лечащее зелье, применить способность к исцелению, выйти из боя (если это соответствует характеру), найти укрытие или использовать защитное умение.
+
+2.  **Выполнение Роли:**
+    *   **Целитель (Healer):** Если союзники ранены, основная задача — лечить их. Атаковать только в крайнем случае.
+    *   **Танк (Tank):** Защищать более слабых союзников. Привлекать на себя внимание самых опасных врагов, использовать провоцирующие умения.
+    *   **ДД (Damage Dealer):** Наносить максимальный урон. Фокусироваться на самых опасных или уязвимых целях (враги с низким HP, вражеские лекари или маги).
+    *   **Контроль (Controller):** Использовать способности, которые ослабляют врагов или контролируют поле боя (оглушение, паралич, создание препятствий).
+
+3.  **Тактическое Преимущество:**
+    *   **Фокусировка огня:** Если другие NPC уже атакуют одну цел��, присоединяйся к ним, чтобы быстрее ее уничтожить.
+    *   **Устранение угроз:** В первую очередь выводи из строя врагов, которые представляют наибольшую угрозу (те, кто наносит много урона, лечит или контролирует).
+    *   **Использование окружения:** Если в описании сцены есть интерактивные объекты (`scene.objects`), которые можно использовать в бою (сбросить люстру, опрокинуть стол), рассмотри возможность их использования.
+    *   **Позиционирование:** Перемещайся, чтобы занять выгодную позицию (например, лучнику — на возвышенность, разбойнику — за спину врага).
+
+4.  **Соответствие Характеру:**
+    *   **Трус (Cowardly):** Будет атаковать только слабых или исподтишка. При малейшей опасности попытается сбежать.
+    *   **Берсерк (Berserk):** Всегда будет атаковать ближайшего врага самым м��щным оружием, не думая о последствиях.
+    *   **Тактик (Tactician):** Будет действовать согласно вышеописанным тактическим приоритетам, выбирая самое умное действие.
+</TACTICAL_HEURISTICS>
+
 <TASK>
-Проанализируй личность персонажа, его цели и текущую боевую обстановку. Выбери его следующее действие.
-Твой ответ должен быть **короткой фразой, описывающей действие**, как буд��о ее говорит игрок.
+Проанализируй профиль персонажа, его роль, состояние и тактическую обстановку. Выбери его следующее действие.
+Твой ответ должен быть **короткой фразой, описывающей действие от первого лица**, как будто ее говорит игрок.
 Не пиши полную историю, только само действие.
 
-Примеры хороших ответов:
-- "Атакую Бориса Бритву своим ледяным копьем."
-- "Использую способность 'Ледяная стена', чтобы разделить группу."
-- "Пытаюсь отступить в тень, чтобы подготовить засаду."
+**Примеры хороших ответов:**
+- "Атакую Бориса Бритву своим ледяным копьем, целясь в его раненое плечо."
+- "Использую 'Ледяную стену', чтобы отрезать вражеского лекаря от его союзников."
+- "Я тяжело ранен, поэтому отступаю за колонну и пью лечебное зелье."
+- "Защищаю нашего мага, становясь между ним и ворвав��имся орком."
 
 Твой ответ:
 """

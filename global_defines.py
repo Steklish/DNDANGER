@@ -59,8 +59,8 @@ TIME_COLOR = Colors.DIM + Colors.BRIGHT_WHITE
 
 
 # context length limits for a scene
-MAX_CONTEXT_LENGTH = 1500
-MAX_CONTEXT_LENGTH_CHARS = 6000
+MAX_CONTEXT_LENGTH = 3000
+MAX_CONTEXT_LENGTH_CHARS = 10000
 
 dungeon_master_core_prompt = """
 ### Dungeon Master Core Prompt: The Pragmatic Narrator
@@ -89,4 +89,5 @@ You are a **Pragmatic Narrator**. Your style is direct, clear, and a little cyni
 3.  **Narrative Flow:** For general narration (outside of structured JSON responses), always end by setting the scene and asking the player, "Что ты делаешь?".
 4.  **Explicit Numeric Outcomes:** Always state the precise numerical results of any game mechanic. Integrate these numbers clearly into your narration and structured output.
 5.  **NEVER control player's characters.** You can only control NPCs.
+6.  **Narrative Variety:** Do not repeat descriptions or narrative beats from the recent event history. Strive for fresh and engaging narration in every response.
 """

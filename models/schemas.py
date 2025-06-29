@@ -1,4 +1,5 @@
 from enum import Enum
+from turtle import position
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional
 
@@ -74,6 +75,8 @@ class Character(BaseModel):
     intelligence: int = Field(description="Интеллект (Intelligence). Измеряет остроту ума и способность к логическому мышлению.")
     wisdom: int = Field(description="Мудрость (Wisdom). Отражает здравомыслие, интуицию и гармонию с окружающим миром.")
     charisma: int = Field(description="Харизма (Charisma). Измеряет силу личности, умение убеждать и личное обаяние.")
+    
+    position_in_scene: str = Field(description="A description of where the character is located within the scene")
     
 class SceneObject(BaseModel):
     """

@@ -1,4 +1,5 @@
-from typing import TYPE_CHECKING
+import asyncio
+from typing import TYPE_CHECKING, Optional
 
 from server_communication.events import EventBuilder
 if TYPE_CHECKING:
@@ -17,7 +18,7 @@ from global_defines import *
 PROMPT_PREVIEW_LENGTH = 10
 
 class ImageGenerator:
-    def __init__(self, game : 'Game'):
+    def __init__(self, game: 'Game', main_loop: Optional[asyncio.AbstractEventLoop] = None):
         self.client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
         self.model = "gemini-2.0-flash-preview-image-generation"
         self.image_dir = os.path.join("static", "images")
@@ -28,93 +29,105 @@ class ImageGenerator:
         self.worker_thread = None
         self.stop_event = threading.Event()
         self.game = game
+        self.main_loop = main_loop
 
+    def _async_worker_entry(self):
+        """The entry point for the new thread. It creates and runs the asyncio event loop."""
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(self._async_worker())
 
-    async def _worker(self):
+    async def _async_worker(self):
+        """The main async logic for the worker. It waits for tasks and runs them."""
+        print(f"{SUCCESS_COLOR}(IMAGEN) Async worker started.{Colors.RESET}")
         while not self.stop_event.is_set():
             try:
-                # Wait for a task, with a timeout to allow checking the stop_event
-                prompt, file_name = self.task_queue.get(timeout=1)
-                await self._perform_generation(prompt, file_name)
-                self.task_queue.task_done()
+                prompt, file_name, generation_type = await asyncio.get_running_loop().run_in_executor(
+                    None, lambda: self.task_queue.get(timeout=1)
+                )
+                asyncio.create_task(self._perform_generation(prompt, file_name, generation_type))
             except queue.Empty:
+                await asyncio.sleep(0.1)
                 continue
             except Exception as e:
-                print(f"{ERROR_COLOR}Error in image generation worker: {e}{Colors.RESET}")
+                print(f"{ERROR_COLOR}Error in async worker loop: {e}{Colors.RESET}")
 
-    async def _perform_generation(self, prompt: str, file_name: str, type : str = "CHARACTER"):
-        """
-        Generates an image based on the given prompt and saves it to a file.
-        """
-        print(f"{INFO_COLOR}(IMAGEN){Colors.RESET} Starting generation for prompt: {prompt[:PROMPT_PREVIEW_LENGTH] + '...' if len(prompt) > PROMPT_PREVIEW_LENGTH else prompt}")
+    async def _perform_generation(self, prompt: str, file_name: str, request_type : str = "CHARACTER"):
+        """Generates an image and schedules the announcement on the main event loop."""
+        print(f"{INFO_COLOR}(IMAGEN){Colors.RESET} Starting generation for: {file_name}")
         start_time = time.monotonic()
-        prompt += "Generate an imge in a dark fantasy highly realistic style. Use square proportions for the image."
+        full_prompt = prompt + " Generate an image in a dark fantasy, highly realistic style. Use dark tones. Generate a square image. Generate a single high quality image. Dont use any text in image."
+        
         try:
-            contents = [
-                types.Content(
-                    role="user",
-                    parts=[types.Part.from_text(text=prompt)],
+            # The SDK call is synchronous, so we run it in a thread to avoid blocking our worker's loop
+            response_chunks = await asyncio.to_thread(
+                self.client.models.generate_content_stream,
+                model=self.model,
+                contents=[types.Content(role="user", parts=[types.Part.from_text(text=full_prompt)])],
+                config=types.GenerateContentConfig(
+                    response_modalities=["IMAGE", "TEXT"],
+                    response_mime_type="text/plain",
                 ),
-            ]
-            
-            generate_content_config = types.GenerateContentConfig(
-                response_modalities=["IMAGE", "TEXT"],
-                response_mime_type="text/plain",
             )
 
-            for chunk in self.client.models.generate_content_stream(
-                model=self.model,
-                contents=contents, # type: ignore
-                config=generate_content_config,
-            ):
-                if (
-                    chunk.candidates and chunk.candidates[0].content and
-                    chunk.candidates[0].content.parts
-                ):
+            image_saved = False
+            for chunk in response_chunks:
+                if chunk.candidates and chunk.candidates[0].content and chunk.candidates[0].content.parts:
                     for part in chunk.candidates[0].content.parts:
                         if part.inline_data and part.inline_data.data:
-                            inline_data = part.inline_data
-                            data_buffer = inline_data.data
-                            file_extension = mimetypes.guess_extension(inline_data.mime_type) or ".png" # type: ignore
+                            file_extension = mimetypes.guess_extension(part.inline_data.mime_type) or ".png" # type: ignore
                             image_path = os.path.join(self.image_dir, f"{file_name}{file_extension}")
                             
                             with open(image_path, "wb") as f:
-                                f.write(data_buffer) # type: ignore
+                                f.write(part.inline_data.data)
                             
                             end_time = time.monotonic()
-                            print(f"{TIME_COLOR}Image generation took {end_time - start_time:.2f} seconds.{Colors.RESET}")
+                            print(f"{TIME_COLOR}Image generation for '{file_name}' took {end_time - start_time:.2f}s.{Colors.RESET}")
                             print(f"{SUCCESS_COLOR}File saved to: {image_path}{Colors.RESET}")
-                            if type == "SCENE":
-                                await self.game.announce(EventBuilder.scene_change("scene_changed", f"{file_name}{file_extension}"))            
-                            return
+                            
+                            # This is the crucial part: calling back to the main thread
+                            if self.main_loop and self.main_loop.is_running():
+                                if  request_type == "SCENE":
+                                    event = EventBuilder.scene_change("info",f"{file_name}{file_extension}")
+                                    asyncio.run_coroutine_threadsafe(self.game.announce(event), self.main_loop)
+                            
+                            image_saved = True
+                            break
+                if image_saved:
+                    break
             
-            print(f"{WARNING_COLOR}Image generation finished but no image data was returned.{Colors.RESET}")
+            if not image_saved:
+                print(f"{WARNING_COLOR}Image generation for '{file_name}' finished with no image data.{Colors.RESET}")
 
         except Exception as e:
-            print(f"{ERROR_COLOR}An exception occurred during image generation: {e}{Colors.RESET}")
+            print(f"{ERROR_COLOR}Exception during image generation for '{file_name}': {e}{Colors.RESET}")
 
-    def submit_generation_task(self, prompt: str, file_name: str):
-        """
-        Submits a task to the generation queue. Does not block.
-        """
-        print(f"{INFO_COLOR}(IMAGEN){Colors.RESET} Submitting task for prompt: {prompt[:PROMPT_PREVIEW_LENGTH] + '...' if len(prompt) > PROMPT_PREVIEW_LENGTH else prompt}")
-        self.task_queue.put((prompt, file_name))
+    def submit_generation_task(self, prompt: str, file_name: str, generation_type: str = "CHARACTER"):
+        """Submits a task to the generation queue. Does not block."""
+        print(f"{INFO_COLOR}(IMAGEN){Colors.RESET} Submitting task for: {file_name}")
+        self.task_queue.put((prompt, file_name, generation_type))
 
     def start(self):
         """Starts the worker thread."""
         if self.worker_thread is None or not self.worker_thread.is_alive():
+            if self.main_loop is None:
+                try:
+                    self.main_loop = asyncio.get_running_loop()
+                except RuntimeError:
+                    print(f"{ERROR_COLOR}(IMAGEN) Could not get running event loop. Call start() from an async context.{Colors.RESET}")
+                    return
+
             self.stop_event.clear()
-            self.worker_thread = threading.Thread(target=self._worker, daemon=True)
+            self.worker_thread = threading.Thread(target=self._async_worker_entry, daemon=True)
             self.worker_thread.start()
-            print(f"{SUCCESS_COLOR}(IMAGEN) Worker thread started.{Colors.RESET}")
 
     def stop(self, wait_for_completion=True):
         """Stops the worker thread."""
         print(f"{INFO_COLOR}(IMAGEN) Stopping worker thread...{Colors.RESET}")
         if wait_for_completion:
             print("(Waiting for queue to empty)")
-            self.task_queue.join() # Wait for all tasks to be processed
+            self.task_queue.join()
         self.stop_event.set()
         if self.worker_thread and self.worker_thread.is_alive():
-            self.worker_thread.join() # Wait for the thread to terminate
+            self.worker_thread.join()
         print(f"{SUCCESS_COLOR}(IMAGEN) Worker thread stopped.{Colors.RESET}")
