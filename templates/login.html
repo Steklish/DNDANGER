@@ -13,11 +13,9 @@
             <select id="username" name="username" required>
                 <option value="" disabled selected>Select your username</option>
                 {% for char in character_list %}
-                    {% if char.is_player %}
-                        <option value="{{ char.name }}">{{ char.name }}</option>
-                    {% else %}
-                        <option disabled value="{{ char.name }}">{{ char.name }}</option>
-                    {% endif %}    
+                    <option value="{{ char.name }}" {% if not char.is_player %}disabled{% endif %}>
+                        {{ char.name }} {% if not char.is_player %}(NPC){% endif %}
+                    </option>
                 {% endfor %}
                 
             </select>

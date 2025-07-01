@@ -197,7 +197,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    const PLAYER_COLORS = 8; // Number of player colors defined in CSS
+    const PLAYER_COLORS = 10; // Number of player colors defined in CSS
 
     function simpleHashCode(str) {
         let hash = 0;

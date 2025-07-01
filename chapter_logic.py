@@ -1,4 +1,5 @@
 from typing import TYPE_CHECKING
+import inspect
 
 from server_communication.events import EventBuilder
 if TYPE_CHECKING:
@@ -40,6 +41,7 @@ class Chapter:
         self.prompter = Prompter()
         self.story_manager = story_manager
         self.event_log: List[Dict[str, Any]] = []
+        self.game = game
         self.image_generator = ImageGenerator(game)
         self.image_generator.start()
         self.generate_scene()
@@ -125,13 +127,37 @@ Based on the context and heuristics, generate a JSON object that conforms to the
         try:
             original_scene_json = self.scene.model_dump_json(indent=2) # type: ignore
             self.log_event("scene_update_start", scene_name=scene_name, changes=changes_to_make, original_scene=original_scene_json)
+            
+            # Create a prompt that instructs the LLM to modify the scene based on relative changes
+            prompt = f"""
+<ROLE>
+You are a meticulous D&D Game State Engine. Your task is to receive the current JSON data of a scene and a description of relative changes, then output a new, updated JSON object for that scene.
+</ROLE>
+
+<GAME_RULES>
+1.  **Rule of Minimal Change:** Only modify fields that are directly and logically affected by the requested changes.
+2.  **Rule of Atomicity:** Apply each change as a single, atomic operation.
+</GAME_RULES>
+
+<TASK>
+Update the following scene's data based on the described changes.
+
+<SCENE_DATA_BEFORE_CHANGES>
+{original_scene_json}
+</SCENE_DATA_BEFORE_CHANGES>
+
+<CHANGES_TO_APPLY>
+{changes_to_make}
+</CHANGES_TO_APPLY>
+
+<OUTPUT_INSTRUCTIONS>
+Your response must be ONLY the complete, updated JSON object for the scene. Do not include any explanations, markdown formatting, or any other text outside of the final JSON structure.
+</OUTPUT_INSTRUCTIONS>
+"""
+
             self.scene = self.generator.generate(
                 pydantic_model=Scene,
-                prompt=f"""
-                Make following changes to the scene:
-                {str(self.scene)}
-                Changes to make: {changes_to_make}
-                """,
+                prompt=prompt,
                 language=self.language
             )
             
@@ -165,7 +191,7 @@ Based on the context and heuristics, generate a JSON object that conforms to the
 
             prompt = f"""
 <ROLE>
-You are a meticulous D&D Game State Engine. Your task is to receive the current JSON data of a character and a description of changes, then output a new, updated JSON object for that character. You must follow the game rules precisely and only output the final JSON.
+You are a meticulous D&D Game State Engine. Your task is to receive the current JSON data of a character and a description of relative changes, then output a new, updated JSON object for that character. You must follow the game rules precisely and only output the final JSON.
 </ROLE>
 
 <GAME_RULES>
@@ -173,9 +199,9 @@ You MUST strictly follow these rules when updating the character. These rules ha
 
 1.  **Rule of Life and Death:** If a character takes damage that reduces their `current_hp` to 0 or below, you MUST set `current_hp` to exactly `0` and set `is_alive` to `false`. A character cannot have negative HP. Conversely, if a dead character is healed, their `is_alive` status must become `true`.
 
-2.  **Rule of Inventory Management:** If the changes describe an item being used up (like a potion), destroyed, dropped, or unequipped (like a character taking off their armor), you MUST remove that item from the `inventory` list.
+2.  **Rule of Inventory Management:** If the changes describe an item being added or removed, you MUST update the `inventory` list accordingly.
 
-3.  **Rule of Armor Class (AC):** If a character equips or unequips armor or a shield, you MUST adjust their `ac` value accordingly. If an item providing AC is removed from inventory (Rule 2), the `ac` value must be decreased.
+3.  **Rule of Armor Class (AC):** If a character equips or unequips armor or a shield, you MUST adjust their `ac` value accordingly.
 
 4.  **Rule of Health Cap:** A character's `current_hp` can NEVER exceed their `max_hp`. If healing would take them above the maximum, cap it at `max_hp`.
 
@@ -344,109 +370,8 @@ Your response must be ONLY the complete, updated JSON object for the character. 
             "global_story_context": self.story_manager.get_current_plot_context()
         }
 
-        return f"<CONTEXT_DATA>\n{json.dumps(context_dict, indent=2, ensure_ascii=False)}\n</CONTEXT_DATA>"
-
-
-
-
-
-
-    async def action(self, character: Character, action_text: str, is_NPC = False):
-        """
-        Executes an action and immediately gets both the narrative and the structured changes.
-        """
-        print(f"\n{ENTITY_COLOR}{character.name}{Colors.RESET} {INFO_COLOR}performs action:{Colors.RESET} {action_text}")
-        self.log_event("action_start", character_name=character.name, action_text=action_text, is_npc=is_NPC)
-
-        # Use a generator that can directly output a Pydantic object
-        # лол
-        # это вообще не та функция, которую я сюда планировал
-        outcome: ActionOutcome = self.generator.generate(
-            pydantic_model=ActionOutcome,
-            prompt=self.prompter.get_action_prompt(self, character, action_text, is_NPC),
-            language=self.language
-        )
-
-        narrative = outcome.narrative_description
-        changes = outcome.structural_changes
-        changes_as_dicts = [change.model_dump() for change in changes]
-        self.log_event("action_outcome", character_name=character.name, narrative=narrative, changes=changes_as_dicts, is_legal=outcome.is_legal)
-
-        # The rest of the a
-        action_summary = f"Action by {character.name}: '{action_text}'. Outcome: {narrative}"
-        self.context += f"\n\n<ACTION_LOG>\n{action_summary}\n</ACTION_LOG>\n"
-        yield EventBuilder.DM_message(narrative) # type: ignore
-
-        if is_NPC: outcome.is_legal = True
-        
-        if outcome.is_legal:
-            if changes:
-                for i, change in enumerate(changes, 1):
-                    if change.object_type == "character":
-                        await self.update_character(change.object_name, change.changes)
-                    elif change.object_type == "scene":
-                        await self.update_scene(change.object_name, change.changes)
-                        
-                    yield EventBuilder.state_update_required(
-                        update=f"{change.object_name} был обновлен ({change.changes})",
-                        total=len(changes), 
-                        current=i
-                    )
-                    yield EventBuilder.alert(f"{change.object_name}: {change.changes}")
-            else:
-                self.context += "<ACTION_OUTCOMES>No structural changes occurred.</ACTION_OUTCOMES>"
-            print(f"{SUCCESS_COLOR}All changes applied successfully{Colors.RESET}")    
-            async for value in self.after_action(outcome):
-                yield value
-        else:
-            self.context += f"\n<ACTION_FAILURE>Action by {character.name} ('{action_text}') was deemed illegal. No changes were made.</ACTION_FAILURE>\n"
-            yield EventBuilder.alert("Impossible to act...")
-        
-    async def askedDM(self, character: Character, question: str):
-        """
-        Handles a character asking the DM a question, ensuring the response is in the second person.
-        """
-        print(f"\n{ENTITY_COLOR}{character.name}{Colors.RESET} {INFO_COLOR}asks:{Colors.RESET} {question}")
-        self.log_event("asked_dm", character_name=character.name, question=question)
-        
-        # Pass the active character's name to get the right context
-        context_with_active_char = self.get_actual_context(active_character_name=character.name)
-        
-        prompt = f"""
-<ROLE>
-{global_defines.dungeon_master_core_prompt}
-</ROLE>
-
-<TASK>
-1.  **Identify the Player:** In the `<CONTEXT_DATA>` and `<PLAYER_WHO_IS_ASKING>`, find the character where `is_currently_acting` is `true`. This is the player you are speaking to.
-2.  **Address Them Directly:** Formulate your response in the second person, as if you are speaking directly to that player. Use "you" and "your".
-3.  **Answer the Question:** Based on the full context provided, answer the player's question clearly and concisely.
-4.  **Use Highlighting:** Emphasize important keywords and names using `<span class='keyword'>keyword</span>` and `<span class='name'>Name</span>` tags.
-5.  **Do Not Affect the World:** Your response is purely informational. It should not cause any changes to the game state.
-</TASK>
-
-<EXAMPLE>
-- **Player's Question:** "What do I see in the room?"
-- **Your Response:** "You see a large, dusty room with a wooden table in the center. On the table, you notice an old <span class='keyword'>book</span> and a single <span class='name'>silver key</span>."
-</EXAMPLE>
-
-<CONTEXT_DATA>
-{context_with_active_char}
-</CONTEXT_DATA>
-
-<PLAYER_WHO_IS_ASKING>
-{character.name}
-</PLAYER_WHO_IS_ASKING>
-
-<PLAYER_QUESTION>
-"{question}"
-</PLAYER_QUESTION>
-"""
-        reply = self.classifier.general_text_llm_request(prompt)
-        self.context += f"<player asked the DM>{character.name} asks DM: {question}\nDM's response: {reply}</player asked the DM>\n"
-        self.log_event("dm_reply", character_name=character.name, reply=reply)
-        yield EventBuilder.DM_message(reply)
-
+        return f"<CONTEXT_DATA>\n{json.dumps(str(context_dict), indent=2, ensure_ascii=False)}\n</CONTEXT_DATA>"
+    
     def trim_context(self):
         print(f"\n{DEBUG_COLOR}Context trimming...{Colors.RED} {len(self.context)} chars of context {Colors.RESET}") # type: ignore
         print(f"{Colors.RED}context before{self.context}")
@@ -484,12 +409,13 @@ Your response must be ONLY the complete, updated JSON object for the character. 
         Returns a tuple containing the event generator and a boolean indicating if a turn-consuming action was taken.
         """
         if not character.is_alive:
-            return self.askedDM(character, interaction), False
+            # return self.askedDM(character, interaction), False
+            pass
 
         # Get the full game context to help the AI make a better decision
         context = self.get_actual_context(active_character_name=character.name)
 
-        decision: ClassifyInformationOrActionRequest = self.classifier.generate(
+        user_request: UserRequest = self.classifier.generate(
             contents=f"""
 <ROLE>
 You are an intelligent request router for a D&D game. Your task is to analyze a player's request in the context of recent events and classify it as either an in-game character action OR a meta-question to the Dungeon Master.
@@ -506,12 +432,12 @@ Analyze the player's request below, using the provided game context. Your goal i
 </CONTEXT_AWARENESS_RULE>
 
 <CATEGORY_DEFINITIONS>
-1.  **Действие Персонажа (Character Action) -> `decision: false`**
+1.  **Действие Персонажа (Character Action) -> `request_type: 'action'`**
     *   The player describes what their character is doing, saying, or attempting within the game world.
     *   This includes direct replies to NPCs, even if phrased as a question.
     *   **Keywords:** "Я атакую", "Я иду", "Я говорю ему", "Я осматриваю комнату".
 
-2.  **Запрос к Мастеру (Query to the DM) -> `decision: true`**
+2.  **Запрос к Мастеру (Query to the DM) -> `request_type: 'question'`**
     *   The player asks a question directly to the Dungeon Master about rules, the world, or their character's state. This is a meta-request for information.
     *   **Keywords:** "Что я вижу?", "Могу ли я...?", "Расскажи подробнее о...", "OOC".
 </CATEGORY_DEFINITIONS>
@@ -525,17 +451,104 @@ Analyze the player's request below, using the provided game context. Your goal i
 </PLAYER_REQUEST_TO_CLASSIFY>
 
 <OUTPUT_INSTRUCTIONS>
-Provide your response as a single JSON object matching the `ClassifyInformationOrActionRequest` model, with no other text.
+Provide your response as a single JSON object matching the `UserRequest` model, with no other text.
 </OUTPUT_INSTRUCTIONS>
 """,
-            pydantic_model=ClassifyInformationOrActionRequest
-        )  # type: ignore
-        if decision.decision: # type: ignore
-            print(f"{INFO_COLOR}Request for info {Colors.RESET}")
-            return self.askedDM(character, interaction), False
+            pydantic_model=UserRequest
+        ) # type: ignore
+        
+        return self.process_player_input(character, user_request), user_request.request_type == "action"
+
+    async def process_player_input(self, character: Character, user_request: UserRequest, is_NPC = False):
+        """
+        Executes an action and immediately gets both the narrative and the structured changes.
+        """
+        print(f"\n{ENTITY_COLOR}{character.name}{Colors.RESET} {INFO_COLOR}performs action:{Colors.RESET} {user_request.text}")
+        self.log_event("action_start", character_name=character.name, action_text=user_request.text, is_npc=is_NPC)
+
+        # Use a generator that can directly output a Pydantic object
+        outcome: ActionOutcome = self.generator.generate(
+            pydantic_model=ActionOutcome,
+            prompt=self.prompter.get_process_player_input_prompt(self, character, user_request, is_NPC),
+            language=self.language
+        )
+
+        narrative = outcome.narrative_description
+        changes = outcome.structural_changes
+        changes_as_dicts = [change.model_dump() for change in changes]
+        self.log_event("action_outcome", character_name=character.name, narrative=narrative, changes=changes_as_dicts, is_legal=outcome.is_legal)
+
+        # The rest of the a
+        action_summary = f"Action by {character.name}: '{user_request.text}'. Outcome: {narrative}"
+        self.context += f"\n\n<ACTION_LOG>\n{action_summary}\n</ACTION_LOG>\n"
+        yield EventBuilder.DM_message(narrative) # type: ignore
+
+        if is_NPC: outcome.is_legal = True
+        
+        if outcome.is_legal:
+            if changes:
+                for i, change in enumerate(changes, 1):
+                    if change.object_type == "character":
+                        await self.update_character(change.object_name, change.changes)
+                    elif change.object_type == "scene":
+                        await self.update_scene(change.object_name, change.changes)
+                        
+                    yield EventBuilder.state_update_required(
+                        update=f"{change.object_name} был обновлен ({change.changes})",
+                        total=len(changes), 
+                        current=i
+                    )
+                    yield EventBuilder.alert(f"{change.object_name}: {change.changes}", inspect.currentframe().f_code.co_name) # type: ignore
+            else:
+                self.context += "<ACTION_OUTCOMES>No structural changes occurred.</ACTION_OUTCOMES>"
+            
+            async for event in self.audit_action_application(outcome):
+                yield event
+
+            print(f"{SUCCESS_COLOR}All changes applied successfully{Colors.RESET}")    
+            async for value in self.after_action(outcome):
+                yield value
         else:
-            print(f"{INFO_COLOR}Request for action {Colors.RESET}")
-            return self.action(character, interaction), True
+            self.context += f"\n<ACTION_FAILURE>Action by {character.name} ('{user_request.text}') was deemed illegal. No changes were made.</ACTION_FAILURE>\n"
+            yield EventBuilder.alert("Impossible to act...", inspect.currentframe().f_code.co_name) # type: ignore
+
+    async def audit_action_application(self, outcome: ActionOutcome):
+        """
+        Audits the result of an action, finds discrepancies, and applies corrections.
+        """
+        print(f"\n{INFO_COLOR}Auditing application of action: {outcome.narrative_description[:50]}...{Colors.RESET}")
+
+        prompt = self.prompter.get_audit_prompt(self, outcome)
+
+        # We expect a list of changes, so we need a wrapper model
+        class CorrectionList(BaseModel):
+            corrections: List[ChangesToMake]
+
+        correction_wrapper = self.generator.generate(
+            pydantic_model=CorrectionList,
+            prompt=prompt,
+            language=self.language
+        )
+
+        corrections = correction_wrapper.corrections
+
+        if not corrections:
+            print(f"{SUCCESS_COLOR}Audit passed. No corrections needed.{Colors.RESET}")
+            return
+
+        print(f"{WARNING_COLOR}Audit found {len(corrections)} discrepancies. Applying corrections...{Colors.RESET}")
+        self.log_event("audit_found_discrepancies", count=len(corrections), corrections=corrections)
+
+        for change in corrections:
+            try:
+                if change.object_type == "character":
+                    await self.update_character(change.object_name, change.changes)
+                elif change.object_type == "scene":
+                    await self.update_scene(change.object_name, change.changes)
+                yield EventBuilder.alert(f"AUDIT CORRECTION: {change.object_name}: {change.changes}", inspect.currentframe().f_code.co_name) # type: ignore
+            except Exception as e:
+                print(f"{ERROR_COLOR}Failed to apply audit correction: {e}{Colors.RESET}")
+                self.log_event("audit_correction_failed", error=str(e), change=change)
     
     def get_character_by_name(self, name: str) -> Character:
         """
@@ -554,6 +567,14 @@ Provide your response as a single JSON object matching the `ClassifyInformationO
         except ValueError as e:
             # Re-raise with a more specific message
             raise Exception(f"Character '{name}' not found. {e}")
+
+    def get_last_dm_messages(self, n: int) -> str:
+        """
+        Retrieves the last n messages from the DM.
+        """
+        dm_messages = [msg['message_text'] for msg in self.game.message_history if msg['sender_name'] == 'DM']
+        last_n_messages = dm_messages[-n:]
+        return "\n".join(last_n_messages)
     
     
     async def after_action(self, outcome:ActionOutcome):
@@ -568,7 +589,7 @@ Provide your response as a single JSON object matching the `ClassifyInformationO
         print(analisys)
         if self.game_mode != analisys.recommended_mode:
             self.game_mode = analisys.recommended_mode
-            yield EventBuilder.alert(f'Game mode changed to <span class="keyword">{self.game_mode.name}</span>')
+            yield EventBuilder.alert(f'Game mode changed to <span class="keyword">{self.game_mode.name}</span>', inspect.currentframe().f_code.co_name) # type: ignore
         yield EventBuilder.end_of_turn()
     
     async def after_turn(self):
@@ -603,7 +624,7 @@ Provide your response as a single JSON object matching the `ClassifyInformationO
                                 await self.update_character(payload.object_name, payload.changes) # type: ignore
                             elif payload.object_type == "scene": # type: ignore
                                 await self.update_scene(payload.object_name, payload.changes) # type: ignore
-                            yield EventBuilder.alert(f"(narrative){payload.object_name}: {payload.changes}") # type: ignore
+                            yield EventBuilder.alert(f"(narrative){payload.object_name}: {payload.changes}", inspect.currentframe().f_code.co_name) # type: ignore
                         except Exception as e:
                             yield EventBuilder.error(f"Error processing object change for '{getattr(payload, 'object_name', 'N/A')}': {e}")
                             print(f"{ERROR_COLOR}Error in object change: {e}{Colors.RESET}")
@@ -612,7 +633,7 @@ Provide your response as a single JSON object matching the `ClassifyInformationO
                         try:
                             new_character : Character = self.generate_character(change.description, self.context)
                             self.add_character(new_character)
-                            yield EventBuilder.alert(f"(narrative) A new character, {new_character.name}, appears: {change.description}")
+                            yield EventBuilder.alert(f"(narrative) A new character, {new_character.name}, appears: {change.description}", inspect.currentframe().f_code.co_name) # type: ignore
                         except Exception as e:
                             yield EventBuilder.error(f"Error adding character: {e}")
                             print(f"{ERROR_COLOR}Error in ADD_CHARACTER: {e}{Colors.RESET}")
@@ -623,7 +644,7 @@ Provide your response as a single JSON object matching the `ClassifyInformationO
                                 raise TypeError(f"REMOVE_CHARACTER payload must be a string, but got {type(payload)}")
                             char = self.get_character_by_name(payload)
                             self.characters.remove(char)
-                            yield EventBuilder.alert(f"(narrative){payload} was removed: {change.description}")
+                            yield EventBuilder.alert(f"(narrative){payload} was removed: {change.description}", inspect.currentframe().f_code.co_name) # type: ignore
                         except Exception as e:
                             yield EventBuilder.error(f"Error removing character '{payload}': {e}")
                             print(f"{ERROR_COLOR}Error in REMOVE_CHARACTER: {e}{Colors.RESET}")
@@ -633,7 +654,7 @@ Provide your response as a single JSON object matching the `ClassifyInformationO
                             if not hasattr(payload, 'object_name'):
                                 raise TypeError(f"UPDATE_CHARACTER payload is not a valid ChangesToMake object: {payload}")
                             await self.update_character(payload.object_name, payload.changes) # type: ignore
-                            yield EventBuilder.alert(f"(narrative){payload.object_name} was updated: {change.description}") # type: ignore
+                            yield EventBuilder.alert(f"(narrative){payload.object_name} was updated: {change.description}", inspect.currentframe().f_code.co_name) # type: ignore
                         except Exception as e:
                             yield EventBuilder.error(f"Error updating character '{getattr(payload, 'object_name', 'N/A')}': {e}")
                             print(f"{ERROR_COLOR}Error in UPDATE_CHARACTER: {e}{Colors.RESET}")
@@ -695,14 +716,14 @@ Provide your response as a single JSON object matching the `ClassifyInformationO
     *   **Контроль (Controller):** Использовать способности, которые ослабляют врагов или контролируют поле боя (оглушение, паралич, создание препятствий).
 
 3.  **Тактическое Преимущество:**
-    *   **Фокусировка огня:** Если другие NPC уже атакуют одну цел��, присоединяйся к ним, чтобы быстрее ее уничтожить.
+    *   **Фокусировка огня:** Если другие NPC уже атакуют одну цель, присоединяйся к ним, чтобы быстрее ее уничтожить.
     *   **Устранение угроз:** В первую очередь выводи из строя врагов, которые представляют наибольшую угрозу (те, кто наносит много урона, лечит или контролирует).
     *   **Использование окружения:** Если в описании сцены есть интерактивные объекты (`scene.objects`), которые можно использовать в бою (сбросить люстру, опрокинуть стол), рассмотри возможность их использования.
     *   **Позиционирование:** Перемещайся, чтобы занять выгодную позицию (например, лучнику — на возвышенность, разбойнику — за спину врага).
 
 4.  **Соответствие Характеру:**
     *   **Трус (Cowardly):** Будет атаковать только слабых или исподтишка. При малейшей опасности попытается сбежать.
-    *   **Берсерк (Berserk):** Всегда будет атаковать ближайшего врага самым м��щным оружием, не думая о последствиях.
+    *   **Берсерк (Berserk):** Всегда будет атаковать ближайшего врага самым мощным оружием, не думая о последствиях.
     *   **Тактик (Tactician):** Будет действовать согласно вышеописанным тактическим приоритетам, выбирая самое умное действие.
 </TACTICAL_HEURISTICS>
 
@@ -715,11 +736,11 @@ Provide your response as a single JSON object matching the `ClassifyInformationO
 - "Атакую Бориса Бритву своим ледяным копьем, целясь в его раненое плечо."
 - "Использую 'Ледяную стену', чтобы отрезать вражеского лекаря от его союзников."
 - "Я тяжело ранен, поэтому отступаю за колонну и пью лечебное зелье."
-- "Защищаю нашего мага, становясь между ним и ворвав��имся орком."
+- "Защищаю нашего мага, становясь между ним и ворвавшимся орком."
 
 Твой ответ:
 """
         NPC_action = self.classifier.general_text_llm_request(NPC_action_prompt)
-        async for value in self.action(self.get_active_character(), NPC_action, is_NPC=True):
+        user_request = UserRequest(request_type=RequestType.ACTION, text=NPC_action)
+        async for value in self.process_player_input(self.get_active_character(), user_request, is_NPC=True):
             yield value
-        

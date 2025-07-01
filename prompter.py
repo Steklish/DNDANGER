@@ -5,7 +5,11 @@ if TYPE_CHECKING:
 
 import global_defines
 from models.game_modes import GameMode
-from models.schemas import *
+from models.schemas import (
+    Character,
+    ActionOutcome,
+    UserRequest,
+)
 
 
 
@@ -45,22 +49,43 @@ class Prompter:
     *   **Продвижение сюжета:** Действие игрока выполнило условие для развития истории (например, он нашел ключ, и теперь в `proactive_world_changes` должно быть описание того, что секретная дверь в стене теперь может быть открыта).
     *   **Изменение состояния мира:** Действие игрока необратимо изменило окружение (поджег здание, обрушил мост, активировал древний механизм).
     *   **Отложенные последствия:** Действие будет иметь последствие позже. (Например, игрок оскорбил дворянина. `proactive_world_changes` может содержать `ADD_OBJECT` для "Наемного убийцы", который появится позже).
-    *   **Смена сцены (CHANGE_SCENE):** Это самый важный тип изменения. Используй `change_type: CHANGE_SCENE` **каждый раз**, когда все перс��нажи игроков перемещаются из одного места в другое.
+    *   **Обновление взаимодействий:** Если игрок узнает новую информацию, которая открывает новые возможности для диалога или взаимодействия, используйте `UPDATE_CHARACTER` или `UPDATE_SCENE` в `proactive_world_changes`, чтобы добавить новые `interactions`.
+        *   **Пример:** Игрок узнает, что у NPC есть ключ. `proactive_world_changes` должен содержать `UPDATE_CHARACTER` для этого NPC, добавляя "Спросить о ключе" в его `interactions`.
+    *   **Смена сцены (CHANGE_SCENE):** Это самый важный тип изменения. Используй `change_type: CHANGE_SCENE` **каждый раз**, когда все персонажи игроков перемещаются из одного места в другое.
         *   **Пример 1:** Если все игроки выходят из таверны на улицу, ты **ДОЛЖЕН** создать событие `CHANGE_SCENE` с описанием улицы.
         *   **Пример 2:** Если партия спускается в подвал, ты **ДОЛЖЕН** создать событие `CHANGE_SCENE` с описанием подвала.
         *   **Пример 3:** Если игрок телепортируется в другой город, ты **ДОЛЖЕН** создать событие `CHANGE_SCENE`.
     *   **Правило:** Любое действие, которое приводит к тому, что вся группа оказывается в новой локации, должно вызывать `CHANGE_SCENE`.
 
-3.  **Ключевое правило:** НЕ ПЕРЕУСЕРДСТВУЙ. Если игрок просто осматривается или говорит что-то незначительное, мир не должен реагировать. **Пустые списки `[]` — это валидный и частый результат.**
+3.  **КРИТИЧЕСКИ ВАЖНЫЕ ПРАВИЛА для `CHANGE_SCENE`:**
+    *   **Триггер — перемещение всей группы:** Смена сцены происходит **ТОЛЬКО ТОГДА**, когда **ВСЯ ГРУППА ИГРОКОВ** (или ее фокус) перемещается в новую, отчетливо другую локацию.
+    *   **Что НЕ является сменой сцены:**
+        *   Один игрок заглядывает в соседнюю комнату, пока остальные ждут.
+        *   Персонаж просто перемещается в пределах текущей локации (из одного угла таверны в другой).
+        *   Игроки обсуждают, куда пойти дальше, но физически не перемещаются.
+    *   **Что ЯВЛЯЕТСЯ сменой сцены:**
+        *   Вся группа проходит через дверь в новую комнату.
+        *   Партия выходит из пещеры на открытую местность.
+        *   Герои садятся на корабль, и он отплывает.
+        *   Группа телепортируется.
+    *   **Концепция "Фокуса Группы":** Думай о камере в фильме. Сцена меняется, когда камера следует за главными героями в новое место. Если один разведчик уходит вперед, камера (и сцена) ост��ется с основной группой. Сцена меняется, только когда вся группа следует за разведчиком.
+    *   **Обязательность:** Если условия для смены сцены выполнены, ты **ОБЯЗАН** сгенерировать событие `CHANGE_SCENE`. Это не опционально.
 
-</RULES>
+4.  **Ключевое правило:** НЕ ПЕРЕУСЕРДСТВУЙ. Если игрок просто осматривается или говорит что-то незначительное, мир не должен реагировать. **Пустые списки `[]` — это валидный и частый результат.**
+
+</HEURISTICS_FOR_DECISION>
 
 <OUTPUT_FORMAT>
 Твой ответ ДОЛЖЕН быть ОДНИМ JSON-объектом, БЕЗ каких-либо дополнительных пояснений или текста до/после него. JSON должен строго соответствовать Pydantic-модели `NarrativeTurnAnalysis`.
 -   `reasoning`: Краткое объяснение, почему мир реагирует (или нет).
--   `npc_actions`: Список объектов `NPCTurn`. Заполняй, если NPC действуют немедленно. Внутри `NPCTurn` используй полную структуру `ActionOutcome` для описания действия NPC.
+-   `npc_actions`: Список объектов `NPCTurn`. Заполняй, если NPC действуют немедленно. Внутри `NPCTurn` ��спользуй полную структуру `ActionOutcome` для описания действия NPC.
 -   `proactive_world_changes`: Список объектов `ProactiveChange`. Заполняй для сюжетных сдвигов и изменений мира.
 </OUTPUT_FORMAT>
+
+<MEMORY>
+Here are the last few messages from the DM. Avoid using the same phrases. Be creative.
+{chapter.get_last_dm_messages(5)}
+</MEMORY>
 
 <CONTEXT>
 {chapter.get_actual_context()}
@@ -71,11 +96,11 @@ class Prompter:
 </TASK>
 """
 
-    def get_action_prompt(self, chapter: 'Chapter', character: Character, action_text: str, is_NPC: bool = False) -> str:
-
+    def get_process_player_input_prompt(self, chapter: 'Chapter', character: Character, user_request: UserRequest, is_NPC: bool = False) -> str:
+        
         return f"""
 <SYSTEM>
-You are a Dungeon Master's assistant. Your primary role is to interpret player actions, determine their outcomes based on the provided context and rules, and describe those outcomes in a compelling narrative format. You must also provide structured data that the game engine can use to update the game state.
+You are a Dungeon Master's assistant. Your primary role is to interpret player input, determine the outcome based on the provided context and rules, and describe those outcomes in a compelling narrative format. You must also provide structured data that the game engine can use to update the game state.
 </SYSTEM>
 
 <ROLE>
@@ -98,75 +123,86 @@ You are a Dungeon Master's assistant. Your primary role is to interpret player a
     *   **Correct Example:** "You swing your fist towards `Character B`'s face."
     *   **Incorrect Example:** "You punch `Character B`, who is now angry and ready to retaliate."
 </PHILOSOPHY_AND_CORE_MECHANICS>
-
+{global_defines.HTML_TAG_PROMPT}
 <RULES>
-Твоя работа делится на два этапа: сначала проверка законности действия, затем — симуляция его исхода.
+Your work is divided into two stages: first, checking the legality of the action, then simulating its outcome.
 
-**ЭТАП 1: ПРОВЕРКА ЗАКОННОСТИ ДЕЙСТВИЯ (СООТВЕТСТВИЕ ПРАВИЛАМ)**
-Это твой первый и главный шаг. Определи, является ли действие допустимым в рамках правил (`is_legal`).
+**STAGE 1: CHECKING THE LEGALITY OF THE ACTION (RULE COMPLIANCE)**
+This is your first and most important step. Determine if the action is permissible within the rules (`is_legal`).
 
-**Действие НЕЗАКОННО (`is_legal: false`) ТОЛЬКО в следующих случаях:**
-1.  **Нарушение предпосылок:** У персонажа нет необходимого предмета (пытается атаковать мечом, которого нет), заклинания или способности для выполнения действия.
-2.  **Нарушение состояния:** Состояние пер��онажа запрещает действие (пытается говорить, будучи под эффектом <span class="condition">безмолвие</span>; пытается действовать, будучи <span class="condition">парализованным</span>).
-3.  **Нарушение игровой логики:** Запрос на действие, которое невозможно в мире игры (например, "Я отращиваю крылья и улетаю", если персонаж не имеет такой способности).
-4.  **Нарушение границ игрока:** Игрок пытается управлять другими персонажами (NPC или другими игроками) или диктовать события мира ("Я заставляю стражника сдаться", "Я решаю, что буря прекращается").
+**An action is ILLEGAL (`is_legal: false`) ONLY in the following cases:**
+1.  **Violation of prerequisites:** The character does not have the necessary item (trying to attack with a sword they don't have), spell, or ability to perform the action.
+2.  **Violation of state:** The character's condition prohibits the action (trying to speak while under a <span class="condition">silence</span> effect; trying to act while <span class="condition">paralyzed</span>).
+3.  **Violation of game logic:** The request is for an action that is impossible in the game world (e.g., "I grow wings and fly away" if the character has no such ability).
+4.  **Violation of player boundaries:** The player tries to control other characters (NPCs or other players) or dictate world events ("I force the guard to surrender," "I decide the storm stops").
 
-**ВАЖНО:** Сложность или глупость действия **НЕ** делают его незаконным. Попытка убедить короля отдать корону — это `is_legal: true` с чрезвычайно высокой Сложностью (СЛ), а не `is_legal: false`. Если игрок загоняет себя в безвыходную ситуацию, это его выбор, а не нарушение правил.
+**IMPORTANT:** The difficulty or foolishness of an action does **NOT** make it illegal. Trying to persuade the king to give up his crown is `is_legal: true` with an extremely high Difficulty Class (DC), not `is_legal: false`. If a player gets themselves into a no-win situation, that is their choice, not a rule violation.
 
-*   Если действие НЕЗАКОННО, `narrative_description` должен вежливо объяснить, ПОЧЕМУ оно нарушает правила. Поле `structural_changes` должно быть пустым (`[]`).
+*   If the action is ILLEGAL, the `narrative_description` must politely explain WHY it violates the rules. The `structural_changes` field must be empty (`[]`).
 
-**ЭТАП 2: СИМУЛЯЦИЯ ИСХОДА (ДЛЯ ВСЕХ ЗАКОННЫХ ДЕЙСТВИЙ)**
-Если действие возможно (`is_legal: true`), ты симулируешь его исход. Ты не используешь генератор случайных чисел, а **выбираешь** результат, основываясь на логике и вероятности успеха.
+**STAGE 2: SIMULATING THE OUTCOME (FOR ALL LEGAL ACTIONS)**
+If the action is possible (`is_legal: true`), you simulate its outcome. You do not use a random number generator, but **choose** a result based on logic and probability of success.
 
-**Процесс симуляции:**
-1.  **Определи и объяви Проверку.** Для действий с неопределенным исходом (убеждение, взлом, атака) ты должен назначить **Сложность (СЛ)** или использовать **Класс Доспеха (КД)** цели.
-    *   **Сложность (СЛ):** 5 (тривиально), 10 (легко), 15 (средне), 20 (сложно), 25 (очень сложно), 30+ (почти невозможно).
-    *   **Класс Доспеха (КД):** Используй КД цели из контекста.
+**Simulation process:**
+1.  **Determine and declare the Check.** For actions with an uncertain outcome (persuasion, lockpicking, attacking), you must assign a **Difficulty Class (DC)** or use the target's **Armor Class (AC)**.
+    *   **Difficulty Class (DC):** 5 (trivial), 10 (easy), 15 (medium), 20 (hard), 25 (very hard), 30+ (nearly impossible).
+    *   **Armor Class (AC):** Use the target's AC from the context.
 
-2.  **Симулируй "бросок" d20.** Ты **выбираешь** число от 1 до 20, которое отражает шансы на успех.
-    *   **Критический провал (выбери 1):** Для абсурдных или обреченных на провал действий.
-    *   **Неблагоприятная ситуация (выбери 2-8):** Действие выполняется в плохих условиях.
-    *   **Нейтральная ситуация (выбери 9-12):** Нет явных преимуществ или помех.
-    *   **Благоприятная ситуация (выбери 13-18):** У персонажа есть преимущество.
-    *   **Критический успех (выбери 19-20):** Для гениальных идей или идеальных условий.
+2.  **Simulate a d20 "roll."** You **choose** a number from 1 to 20 that reflects the chances of success.
+    *   **Critical failure (choose 1):** For absurd or doomed actions.
+    *   **Unfavorable situation (choose 2-8):** The action is performed under poor conditions.
+    *   **Neutral situation (choose 9-12):** No clear advantages or disadvantages.
+    *   **Favorable situation (choose 13-18):** The character has an advantage.
+    *   **Critical success (choose 19-20):** For brilliant ideas or perfect conditions.
 
-3.  **Покажи полный расчет и вердикт.** В `narrative_description` прозрачно покажи игроку весь расчет.
-    *   **Формат для проверки навыка:** `Проверка [Навыка]: [Результат d20] + [Модификатор] = [Итог] против СЛ [Значение СЛ] -> Успех/Провал.`
-    *   **Формат для атаки:** `Бросок атаки: [Результат d20] + [Модификатор] = [Итог] против КД [Значение КД] -> Попадание/Промах.`
+3.  **Show the full calculation and verdict.** In the `narrative_description`, transparently show the player the entire calculation.
+    *   **Format for skill check:** `[Skill] Check: [d20 result] + [Modifier] = [Total] vs DC [DC value] -> Success/Failure.`
+    *   **Format for attack:** `Attack Roll: [d20 result] + [Modifier] = [Total] vs AC [AC value] -> Hit/Miss.`
 
-4.  **Симуляция других "бросков" (урон, эффекты).** Используй тот же принцип. Для урона 2d6 (диапазон 2-12), выбери результат в зависимости от успеха атаки: слабый удар (2-4), средний (5-8), мощный/критический (9-12). Всегда показывай расчет.
-    *   **Формат для урона:** `Урон: <span class="damage">[результат броска] ([формула кубиков])</span>`
+4.  **Simulate other "rolls" (damage, effects).** Use the same principle. For 2d6 damage (range 2-12), choose a result depending on the attack's success: weak hit (2-4), average (5-8), powerful/critical (9-12). Always show the calculation.
+    *   **Format for damage:** `Damage: <span class="damage">[roll result] ([dice formula])</span>`
 
-5.  **Опиши результат.** После всех расчетов дай яркое и логичное описание последствий. Каждое механическое последствие (урон, исцеление, потраченный предмет) ДОЛЖНО быть отражено в `structural_changes`.
+5.  **Describe the result.** After all calculations, provide a vivid and logical description of the consequences. Every mechanical consequence (damage, healing, spent item) MUST be reflected in `structural_changes`.
 </RULES>
 
 <OUTPUT_FORMAT>
-Твой ответ ДОЛЖЕН быть ОДНИМ JSON-объектом, БЕЗ каких-либо дополнительных пояснений или текста до/после него. JSON должен строго соответствовать Pydantic-модели `ActionOutcome`.
--   `narrative_description`: Красочное описание для игрока. **ОБЯЗАТЕЛЬНО** используй эти HTML-теги:
-    -   `<span class="name">Имя</span>` для имен и названий.
-    -   `<span class="damage">описание урона</span>` для любого вреда.
-    -   `<span class="heal">описание исцеления</span>` для восстановления здоровья.
-    -   `<span class="condition">описание сосстояния</span>` для наложения эффектов.
--   `structural_changes`: Список объектов, описывающих конкретные изменения. Также используй теги. Обязательно указывай числа и результаты бросков, а не сами броски. Если изменений нет, оставь пустым `[]`.
--   `is_legal`: `true` или `false`.
+Your response MUST be a SINGLE JSON object, WITHOUT any additional explanations or text before/after it. The JSON must strictly adhere to the `ActionOutcome` Pydantic model.
+-   `narrative_description`: A colorful description for the player. {global_defines.HTML_TAG_PROMPT}
+-   `structural_changes`: A list of objects describing specific changes. Also use tags. Be sure to specify numbers and roll results, not the rolls themselves. If there are no changes, leave it empty (`[]`).
+-   `is_legal`: `true` or `false`.
+-   `turn_wasted`: `true` if the action consumed a turn, `false` otherwise. Questions do not waste a turn.
 
-**Примеры:**
-- **Действие:** "Я атакую гоблина своим мечом."
-  - **Результат:** `narrative_description` содержит бросок атаки, урон. `structural_changes` содержит изменение `current_hp` гоблина.
-- **Действие:** "Я пью зелье лечения."
-  - **Результат:** `narrative_description` описывает, как персонаж пьет зелье и чувствует себя лучше. `structural_changes` содержит изменение `current_hp` персонажа и удаление зелья из инвентаря.
-- **Действие:** "Я пытаюсь убедить стражника пропустить меня."
-  - **Результат:** `narrative_description` содержит проверку навыка Убеждения и реакцию стражника. `structural_changes` может быть пустым, если стражник не меняет своего мнения.
+**CRITICAL RULES FOR `structural_changes`:**
+1.  **Relativity and Deltas:** Changes MUST be relative. Instead of "set hp to 45," you MUST say "decrease hp by 5" or "increase hp by 10."
+2.  **Atomicity:** Each change should be a single, atomic operation.
+3.  **Scope Limitation:** ONLY list changes for the DIRECTLY affected object. If a player leaves a tavern, the only change is to the player's `position_in_scene` field. DO NOT add a change for the tavern saying "a player left." The scene's state is independent of the character's location within it.
+4.  **No Narrative Changes:** DO NOT modify narrative fields like `personality_history`, `appearance`, or `interactions` via `structural_changes`. These are part of the character's core identity and should only be changed through significant, story-driven events handled by `proactive_world_changes`. `structural_changes` is for mechanical effects ONLY.
+
+**Examples:**
+- **Action:** "I attack the goblin with my sword."
+  - **Result:** `narrative_description` contains the attack roll, damage. `structural_changes` contains a change for the goblin: `changes: "current_hp: -5"`. `turn_wasted` is `true`.
+- **Action:** "I drink a healing potion."
+  - **Result:** `narrative_description` describes the character drinking the potion and feeling better. `structural_changes` contains two changes for the character: `changes: "current_hp: +8"` and `changes: "inventory: -Healing Potion"`. `turn_wasted` is `true`.
+- **Action:** "I try to persuade the guard to let me pass."
+  - **Result:** `narrative_description` contains the Persuasion skill check and the guard's reaction. `structural_changes` may be empty if the guard does not change their mind. `turn_wasted` is `true`.
+- **Action:** "What do I see in the room?"
+    - **Result:** `narrative_description` contains a description of the room. `structural_changes` is empty. `turn_wasted` is `false`.
 </OUTPUT_FORMAT>
+
+<MEMORY>
+Here are the last few messages from the DM. Avoid using the same phrases. Be creative.
+{chapter.get_last_dm_messages(5)}
+</MEMORY>
 
 <CONTEXT>
 {chapter.get_actual_context()}
 </CONTEXT>
 
 <TASK>
-Персонаж <span class="name">{character.name}</span> совершает следующее действие: "{action_text}"
+The character <span class="name">{character.name}</span> makes the following request: "{user_request.text}"
+The request is of type: "{user_request.request_type}"
 {"IMPORTANT: the current character is an NPC so you should make corresponding narrative" if is_NPC else ""}
-Сгенерируй JSON-объект `ActionOutcome`, описывающий результат.
+Generate a JSON object `ActionOutcome` describing the result.
 </TASK>
 """
     
@@ -189,7 +225,7 @@ You are a Dungeon Master's assistant. Your primary role is to interpret player a
 </GOAL>
 
 <DEFINITIONS>
-- **`COMBAT` (Боевой режим):** Структурированный, пошаговый режим. Используется, когда начались активные боевые действия. Время течет дискретно (раунд за раундом). Персонажи совершают действия по очереди.
+- **`COMBAT` (Боевой режим):** С��руктурированный, пошаговый режим. Используется, когда начались активные боевые действия. Время течет дискретно (раунд за раундом). Персонажи совершают действия по очереди.
 - **`NARRATIVE` (Повествовательный режим):** Свободный режим. Используется для диалогов, исследований, путешествий и решения головоломок. Время течет плавно, и персонажи могут действовать свободно, без строгой очередности.
 </DEFINITIONS>
 
@@ -205,7 +241,7 @@ You are a Dungeon Master's assistant. Your primary role is to interpret player a
 2.  **Переход в `NARRATIVE`:**
     *   **Главный триггер:** Последний враг в бою побежден, сдался или сбежал.
     *   **Другие триггеры:** Напряженная ситуация разрешилась мирным путем (успешное убеждение, обман); персонажи успешно скрылись от угрозы; бой окончен, и игроки хотят обыскать тела или исследовать локацию.
-    *   **Пример:** Если персонажи победили всех гоблинов в комнате, режим должен переключиться на `NARRATIVE`, чтобы они могли спокойно собрать добычу.
+    *   **Пример:** Если персонажи поб��дили всех гоблинов в комнате, режим должен переключиться на `NARRATIVE`, чтобы они могли спокойно собрать добычу.
 
 3.  **Сохранение текущего режима:**
     *   Если игра в режиме `COMBAT` и персонаж просто атакует следующего врага, режим остается `COMBAT`.
@@ -251,7 +287,7 @@ The overarching goal of the campaign '{story_manager.story.title}' is: {story_ma
 The current active chapter of the story is '{current_plot_point.title}'.
 The objective for this chapter is: {current_plot_point.description}.
 </STORY_CONTEXT>
-
+{global_defines.HTML_TAG_PROMPT}
 <COMPLETION_CONDITIONS>
 To advance the story, the players need to achieve this: "{current_plot_point.completion_conditions}"
 </COMPLETION_CONDITIONS>
@@ -266,5 +302,100 @@ Your response must be ONLY a valid JSON object that conforms to the `StoryProgre
 - Set `conditions_met` to `true` if the objective is complete.
 - Set `conditions_met` to `false` if the objective is not yet complete.
 - Provide a brief `reasoning` for your decision.
+</TASK>
+"""
+
+    def get_audit_prompt(self, chapter: 'Chapter', intended_outcome: ActionOutcome) -> str:
+        """
+        Generates a prompt for an AI to audit the application of changes to the game state.
+        """
+        return f"""
+<SYSTEM>
+You are a Game State Auditor AI. Your only job is to verify that the intended game changes were correctly applied to the actual game state. You are meticulous, precise, and focused on data integrity.
+</SYSTEM>
+
+<ROLE>
+You will be given an `ActionOutcome` object, which represents the *intended* result of a player's turn. You will also be given the *actual* current context of the game after those changes were supposedly applied. Your task is to compare the two, find any discrepancies, and generate a list of corrective actions if needed.
+</ROLE>
+
+<DEFINITIONS>
+- **Intended Outcome:** The `ActionOutcome` object provided below. This is what *should have* happened.
+- **Actual State:** The `<CONTEXT_DATA>` provided below. This is the state of the world *right now*.
+- **Discrepancy:** A mismatch between the Intended Outcome and the Actual State. For example, the narrative said a character took 10 damage, but their HP in the actual state did not decrease.
+{global_defines.HTML_TAG_PROMPT}
+<RULES_OF_AUDIT>
+1.  **Verify Every Change:** For each instruction in the `structural_changes` of the `intended_outcome`, verify that the change is accurately reflected in the `actual_state`.
+2.  **Check for Omissions:** Look for things implied by the `narrative_description` that are missing from the `actual_state`. For example, if "the sword shatters," it must be removed from the inventory, even if it wasn't in the original `structural_changes`.
+3.  **Generate Corrections:** If you find any discrepancies, create a new list of `ChangesToMake` objects that will fix the `actual_state`. The `changes` description should be clear, e.g., "Set current_hp to 50 to match the damage taken" or "Remove Healing Potion from inventory as it was consumed."
+4.  **Return Empty if Correct:** If the `actual_state` perfectly matches the `intended_outcome`, you MUST return an empty list `[]`.
+
+<INTENDED_OUTCOME>
+{intended_outcome.model_dump_json(indent=2)}
+</INTENDED_OUTCOME>
+
+<ACTUAL_STATE>
+{chapter.get_actual_context()}
+</ACTUAL_STATE>
+
+<TASK>
+Compare the <INTENDED_OUTCOME> with the <ACTUAL_STATE>. Generate a JSON list of `ChangesToMake` objects needed to correct any errors. If no errors are found, return an empty list `[]`.
+</TASK>
+"""
+
+    def get_NPC_action_prompt(self, chapter: 'Chapter', character: Character) -> str:
+        """
+        Generates a prompt for an LLM to decide and describe an NPC's action.
+        """
+        return f"""
+<SYSTEM>
+{global_defines.dungeon_master_core_prompt}
+</SYSTEM>
+
+<ROLE>
+You are the AI controlling the Non-Player Character (NPC) named **{character.name}**. Your task is to decide on a logical and in-character action for your turn, and then describe that action's outcome.
+</ROLE>
+
+<NPC_PROFILE>
+- **Name:** {character.name}
+- **Personality & Goals:** {character.personality_history}
+- **Current HP:** {character.current_hp}/{character.max_hp}
+- **Abilities:** {[ability.name for ability in character.abilities]}
+- **Inventory:** {[item.name for item in character.inventory]}
+- **Current Conditions:** {character.conditions}
+</NPC_PROFILE>
+{global_defines.HTML_TAG_PROMPT}
+<RULES_OF_ACTION>
+1.  **In-Character Decisions:** Your action MUST be consistent with your `Personality & Goals`. A cowardly character should not charge into battle. A greedy character might try to steal something. A loyal bodyguard will protect their charge.
+2.  **Tactical Awareness:** Analyze the `CONTEXT` to make a smart move.
+    *   Who is the biggest threat?
+    *   Is it better to attack, use an ability, use an item, or flee?
+    *   Are there any environmental objects to interact with?
+3.  **Single Action Rule:** You can only perform ONE main action per turn.
+4.  **Simulate the Outcome:** Follow the same simulation rules as the main DM assistant:
+    *   Determine the check (Attack vs. AC, or Skill vs. DC).
+    *   Choose a d20 result that makes sense for the situation.
+    *   Show the full calculation in the narrative.
+    *   Simulate and show damage or other effects.
+    *   Describe the outcome vividly.
+
+<OUTPUT_FORMAT>
+Your response MUST be a SINGLE JSON object, WITHOUT any additional explanations or text before/after it. The JSON must strictly adhere to the `ActionOutcome` Pydantic model.
+-   `narrative_description`: A colorful description of your action and its result for the players. {global_defines.HTML_TAG_PROMPT}
+-   `structural_changes`: A list of objects describing the mechanical changes (damage dealt, items used, etc.).
+- `is_legal`: This should always be `true` as you are the one deciding the action.
+-   `turn_wasted`: This should always be `true`.
+</OUTPUT_FORMAT>
+
+<MEMORY>
+Here are the last few messages from the DM. Avoid using the same phrases. Be creative.
+{chapter.get_last_dm_messages(5)}
+</MEMORY>
+
+<CONTEXT>
+{chapter.get_actual_context()}
+</CONTEXT>
+
+<TASK>
+It is now **{character.name}**'s turn to act. Based on your profile and the current context, decide on the most logical action and generate the `ActionOutcome` JSON object describing it.
 </TASK>
 """

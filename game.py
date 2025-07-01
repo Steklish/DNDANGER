@@ -9,6 +9,7 @@ from server_communication.events import EventBuilder
 from story_manager import StoryManager
 from global_defines import *
 import asyncio
+import inspect
 MAX_MESSAGE_HISTORY_LENGTH = 100
 BUFFER_SIZE_FOR_QUEUE = 100
 KEEPALIVE_INTERVAL_SECONDS = 5
@@ -72,7 +73,7 @@ class Game:
             f"The game is starting. The players are in '{self.story_manager.story.starting_location}'. "
             f"The current scene is: {self.chapter.scene.description}. " # type: ignore
             "Write a compelling introduction from the Dungeon Master's perspective to set the mood and describe the initial surroundings. "
-            "Emphasize important keywords and names using `<span class='keyword'>keyword</span>` and `<span class='name'>Name</span>` tags."
+            f"{HTML_TAG_PROMPT}"
         )
         introduction = self.classifier.general_text_llm_request(prompt + self.context, "Russian")
         
@@ -238,7 +239,7 @@ class Game:
         self.turn_completed_event.set()
 
     async def make_system_announcement(self, alert_text):
-        await self.announce(EventBuilder.alert(alert_text))
+        await self.announce(EventBuilder.alert(alert_text, inspect.currentframe().f_code.co_name)) # type: ignore
         message = {
             "message_text": alert_text,
             "sender_name": "system"

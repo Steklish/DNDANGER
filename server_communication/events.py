@@ -103,16 +103,18 @@ class EventBuilder:
         }
         
     @staticmethod
-    def alert(data: str):
+    def alert(data: str, source_function: str = "Unknown"):
         """Создает событие сообщения от сервера.
 
         Args:
             data (str): Содержимое отправляемого сообщения.
+            source_function (str): Имя функции, отправившей событие.
         """
         return {
             "event": "alert",
             "data": data,
-            "sender": "server"
+            "sender": "server",
+            "source": source_function
         }
     
     @staticmethod

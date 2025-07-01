@@ -72,6 +72,12 @@
     /* --- Palette 8 --- */
     --player-color-8: #F28CAF; /* Soft Pink */
     --player-color-8-bg: #F28CAF4D;
+    /* --- Palette 9 --- */
+    --player-color-9: #C8AAAA;
+    --player-color-9-bg: #C8AAAA4D;
+    /* --- Palette 10 --- */
+    --player-color-10: #FFDAB3;
+    --player-color-10-bg: #FFDAB34D;
     
     
     /*==============================
@@ -381,6 +387,13 @@ select:required:invalid {
 select option {
     background: var(--bg-card);
     color: var(--text-primary);
+}
+
+/* Style for disabled options */
+select option:disabled {
+    color: var(--text-secondary);
+    font-style: italic;
+    background: var(--bg-surface);
 }
 
 /* Hover and Focus states for better interactivity */
@@ -773,6 +786,10 @@ select:focus {
 
     .turn-panel, .characters-panel, .scene-panel {
         overflow-y: visible; /* Allow content to determine height */
+    }
+
+    .message {
+        max-width: 90%;
     }
 }        .login-container {
             display: flex;

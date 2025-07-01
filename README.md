@@ -1,75 +1,94 @@
-# DND Born in Pain
+# DND Guy
 
-An intelligent AI Dungeon Master assistant for D&D campaigns, using Python, FastAPI, and Google Gemini AI to create immersive narratives.
+Интеллектуальный ИИ Мастер Подземелий для D&D
 
-## Ongoing Development
 
-This project is under active development. Current efforts are focused on:
+## Принцип работы системы
 
-*   **Admin Panel:** Enhancing the admin dashboard with more granular control over the game state, including character and story management.
-*   **Character Creation:** Implementing a full-featured character creation screen with a point-buy system for stats.
-*   **API Refinement:** Standardizing API endpoints for consistency and clarity.
-*   **Real-time Updates:** Improving the reliability and scope of real-time updates for all clients.
+Система построена на модульной архитектуре, где каждый компонент отвечает за определенную часть игровой логики.
 
-## Installation
+-   **`main.py`**: Точка входа в приложение. Отвечает за запуск сервера FastAPI, обработку HTTP-запросов, маршрутизацию и управление жизненным циклом игрового экземпляра.
+-   **`game.py`**: Управляет глобальным состоянием игры, включая игровой цикл, режимы игры (бой/повествование), обработку подключений игроков и трансляцию событий всем клиентам через Server-Sent Events (SSE).
+-   **`chapter_logic.py`**: Содержит основную логику одной "главы" или сцены. Управляет персонажами, их взаимодействиями, действиями, ходами и обновлениями состояния сцены.
+-   **`story_manager.py`**: Отвечает за управление сюжетом кампании. Загружает данные из `campaign.json`, отслеживает текущий этап сюжета и проверяет, выполнены ли условия для его продвижения.
+-   **`prompter.py`**: Содержит все промпты (инструкции) для языковой модели (LLM). Этот модуль формирует точные и структурированные запросы к ИИ для генерации текста, принятия решений и обновления состояния игры.
+-   **`classifier.py`**: Использует LLM для классификации запросов пользователя (например, чтобы отличить действие персонажа от вопроса к Мастеру) и для принятия тактических решений.
+-   **`generator.py`**: Использует LLM для генерации структурированных данных в формате Pydantic-моделей. Например, он создает полные описания персонажей, сцен или исходов действий.
+-   **`imagen.py`**: Отвечает за генерацию изображений для персонажей и сцен с помощью Gemini.
 
-1.  **Set up environment variables:**
+## Генерация кампании
+
+Кампания определяется в файле `campaigns/campaign.json`. Этот файл содержит всю необходимую информацию для запуска и проведения приключения.
+
+### Структура `campaign.json`
+
+-   **`title`**: Название кампании.
+-   **`main_goal`**: Главная цель, которую должны достичь игроки.
+-   **`starting_location`**: Место, где начинается приключение.
+-   **`initial_character_prompt`**: Промпт для генерации первого NPC, с которым встретятся игроки.
+-   **`current_plot_point_id`**: ID текущего этапа сюжета.
+-   **`plot_points`**: Массив объектов, описывающих каждый этап сюжета:
+    -   **`id`**: Уникальный идентификатор этапа.
+    -   **`title`**: Название этапа.
+    -   **`description`**: Описание ситуации на данном этапе.
+    -   **`completion_conditions`**: Условия, которые должны быть выполнены игроками для перехода к следующему этапу.
+
+Вы можете создать свою собственную кампанию, изменив этот файл или создав новый и указав путь к нему в `story_manager.py`.
+
+## Генерация изображений
+
+Приложение использует Google Generative AI (Gemini) для создания изображений для персонажей и сцен.
+
+### Принцип работы
+
+1.  **Сервис генерации:** Взаимодействие с API Gemini реализовано в классе `ImageGenerator` (`imagen.py`).
+2.  **Асинхронная генерация:** Чтобы избежать блокировки основного потока приложения, задачи по генерации изображений выполняются в отдельном потоке с использованием очереди для управления запросами.
+3.  **Запуск генерации:**
+    *   **Создание персонажа:** При создании нового персонажа чере�� эндпоинт `/create-character` в `main.py`, в очередь `ImageGenerator` добавляется задача на создание изображения. В качестве промпта используются данные персонажа.
+    *   **Смена сцены:** Метод `game.introduce_scene()` также инициирует генерацию фонового изображения для текущей сцены.
+4.  **Промпты:** Промпты, отправляемые в API Gemini, содержат данные о персонаже или сцене с дополнительной инструкцией для создания изображения в стиле "мрачного фэнтези" и "высокой реалистичности".
+5.  **Хранение изображений:** Сгенерированные изображения сохраняются в директории `static/images`.
+6.  **Обновление интерфейса:** После генерации изображения для сцены, на фронтенд отправляется событие `scene_change`, которое обновляет фоновое изображение чата.
+
+## Установка
+
+1.  **Настройте переменные окружения:**
     ```bash
-    # Copy the example environment file
+    # Скопируйте пример файла окружения
     cp .env.example .env
     ```
-2.  **Configure Google AI credentials:**
-    *   Obtain a Google API key from the Google Cloud Console.
-    *   Add your API key to the `.env` file:
+2.  **Настройте учетные данные Google AI:**
+    *   Получите ключ API Google из Google AI Studio.
+    *   Добавьте ваш ключ API в файл `.env`:
         ```
-        GOOGLE_API_KEY="your-api-key"
-        GEMINI_MODEL_DUMB="gemini-1.5-flash"
+        GOOGLE_API_KEY="ваш-api-ключ"
+        GEMINI_MODEL_DUMB="gemini-2.5-flash-lite-preview-06-17"
         ```
+3.  **Установите зависимости:**
+    ```bash
+    pip install -r requirements.txt
+    ```
 
-## Usage
+## Использование
 
-### Running the application:
+### Запуск приложения:
 
 ```bash
 uvicorn main:app --reload --host 0.0.0.0 --port 8080
 ```
 
-## Technical Details
+После запуска приложения вы можете получить доступ к следующим страницам:
 
-*   **Backend:** FastAPI (asynchronous Python framework)
-*   **Real-time:** Server-Sent Events (SSE) for streaming game events.
-*   **AI:** Google Gemini for content generation.
-*   **Data Validation:** Pydantic
-*   **Templating:** Jinja2
-*   **Frontend:** Vanilla JavaScript and CSS
+*   **Вход:** `http://localhost:8080/`
+*   **Создание персонажа:** `http://localhost:8080/character-creation`
+*   **Интерфейс игрока:** `http://localhost:8080/player/{имя_персонажа}`
+*   **Панель администратора:** `http://localhost:8080/admin`
 
-## API Endpoints
+## Технические детали
 
-### HTML Pages
-*   `GET /`: Login page.
-*   `GET /character-creation`: Character creation page.
-*   `GET /player/{name}`: The main player interface.
-*   `GET /admin`: The admin dashboard.
-
-### Game State & Interaction
-*   `GET /api/game_state`: Retrieves the complete current state of the game.
-*   `POST /interact`: Submits a player action or message.
-*   `POST /create-character`: Creates a new player character.
-
-### Admin & Story Management
-*   `POST /api/story/next`: Advances the story to the next plot point.
-*   `POST /api/story/previous`: Reverts the story to the previous plot point.
-*   `POST /api/story/set/{plot_point_id}`: Jumps to a specific plot point.
-*   `POST /api/character/update`: Updates a character's details.
-*   `DELETE /api/character/{character_name}`: Deletes a character from the game.
-
-### Real-time Stream
-*   `GET /stream`: Establishes an SSE connection for real-time updates.
-
-## Contributing
-
-1.  Fork the repository.
-2.  Create a feature branch (`git checkout -b feature/amazing-feature`).
-3.  Commit your changes (`git commit -m 'Add some amazing feature'`).
-4.  Push to the branch (`git push origin feature/amazing-feature`).
-5.  Open a Pull Request.
+*   **Бэкенд:** FastAPI (асинхронный фреймворк Python)
+*   **Обновления в реальном времени:** Server-Sent Events (SSE) для потоков��й передачи игровых событий.
+*   **ИИ:** Google Gemini для генерации контента.
+*   **Валидация данных:** Pydantic
+*   **Шаблонизация:** Jinja2
+*   **Фронтенд:** Vanilla JavaScript и CSS
