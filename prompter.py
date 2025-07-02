@@ -12,74 +12,67 @@ from models.schemas import (
 )
 
 
-
 class Prompter:
-    def get_narrative_analysis_prompt(self, chapter: 'Chapter') -> str:
+    def get_after_action_analysis_prompt(self, chapter: 'Chapter') -> str:
         """
-        Generates a prompt for an LLM to act as a Narrative Director.
-        This function now pulls its context from the instance's state.
+        Generates a prompt for an LLM to act as a combined Game Director and Narrative Director.
+        This single call determines game mode, NPC reactions, and world changes.
         """
-        # The core prompt logic remains identical. The only change is how
-        # the context is sourced below.
         return f"""
 <SYSTEM>
 {global_defines.dungeon_master_core_prompt}
 </SYSTEM>
 
 <ROLE>
-Ты — Повествовательный Режиссёр (Narrative Director). Твоя задача — сделать мир живым и отзывчивым. Проанализировав действие игрока, ты должен определить, как на него отреагируют NPC и изменится ли мир или сюжет. Ты НЕ описываешь это игроку, а создаешь структурированные инструкции для игрового движка.
+You are a Master AI Game Director. Your task is to analyze the outcome of a player's turn and determine the comprehensive consequences. This involves two main responsibilities:
+1.  **Game Mode Director:** Decide if the game should be in `COMBAT` or `NARRATIVE` mode.
+2.  **Narrative Director:** Decide how the world and its inhabitants react (`proactive_world_changes`).
 </ROLE>
 
 <GOAL>
-Твоя цель — решить, нужны ли ответные действия от NPC (`npc_actions`) или изменения в мире (`proactive_world_changes`) после хода игрока. Если действие игрока было незначительным и не требует реакции, оба списка должны остаться пустыми.
+Analyze the provided context and produce a single, structured JSON object (`AfterActionAnalysis`) that contains both the recommended game mode and any necessary world changes.
 </GOAL>
 
-<HEURISTICS_FOR_DECISION>
+<PART_1_HEURISTICS_GAME_MODE>
+First, decide the `recommended_mode`.
 
-1.  **Когда создавать `npc_actions`?**
-    *   **Прямое взаимодействие:** Игрок обратился к NPC, атаковал его, что-то дал или украл. NPC должен отреагировать.
-    *   **Косвенное воздействие:** Игрок совершил громкое или заметное действие (разбил окно, сотворил яркое заклинание), которое привлекает внимание ближайших NPC.
-    *   **Мотивация NPC:** У NPC есть свои цели (например, `personality_and_goals`). Действие игрока могло помочь или помешать этим целям, провоцируя реакцию. **Это самый важный триггер.**
-        *   **Трусливый NPC** (`personality: "cowardly"`) должен пытаться сбежать или спрятаться при виде опасности.
-        *   **Агрессивный NPC** (`personality: "aggressive"`) может атаковать в ответ на малейшую провокацию.
-        *   **Расчетливый NPC** (`personality: "calculating"`) может сделать вид, что ничего не заметил, но затаить обиду.
-    *   **Пример:** Если игрок угрожает трусливому информатору, информатор (`npc_name: "Pip"`) должен отреагировать (испугаться, попытаться сбежать, выдать информацию). Если игрок угрожает гордому паладину, тот, скорее всего, отреагирует враждебно.
+1.  **Switch to `COMBAT` if:**
+    *   A character performed a hostile action (attacked, cast a harmful spell).
+    *   An NPC declared an intent to attack.
+    *   A trap was sprung, causing harm.
+    *   Any aggressive action that initiates a conflict.
 
-2.  **Когда создавать `proactive_world_changes`?**
-    *   **Продвижение сюжета:** Действие игрока выполнило условие для развития истории (например, он нашел ключ, и теперь в `proactive_world_changes` должно быть описание того, что секретная дверь в стене теперь может быть открыта).
-    *   **Изменение состояния мира:** Действие игрока необратимо изменило окружение (поджег здание, обрушил мост, активировал древний механизм).
-    *   **Отложенные последствия:** Действие будет иметь последствие позже. (Например, игрок оскорбил дворянина. `proactive_world_changes` может содержать `ADD_OBJECT` для "Наемного убийцы", который появится позже).
-    *   **Обновление взаимодействий:** Если игрок узнает новую информацию, которая открывает новые возможности для диалога или взаимодействия, используйте `UPDATE_CHARACTER` или `UPDATE_SCENE` в `proactive_world_changes`, чтобы добавить новые `interactions`.
-        *   **Пример:** Игрок узнает, что у NPC есть ключ. `proactive_world_changes` должен содержать `UPDATE_CHARACTER` для этого NPC, добавляя "Спросить о ключе" в его `interactions`.
-    *   **Смена сцены (CHANGE_SCENE):** Это самый важный тип изменения. Используй `change_type: CHANGE_SCENE` **каждый раз**, когда все персонажи игроков перемещаются из одного места в другое.
-        *   **Пример 1:** Если все игроки выходят из таверны на улицу, ты **ДОЛЖЕН** создать событие `CHANGE_SCENE` с описанием улицы.
-        *   **Пример 2:** Если партия спускается в подвал, ты **ДОЛЖЕН** создать событие `CHANGE_SCENE` с описанием подвала.
-        *   **Пример 3:** Если игрок телепортируется в другой город, ты **ДОЛЖЕН** создать событие `CHANGE_SCENE`.
-    *   **Правило:** Любое действие, которое приводит к тому, что вся группа оказывается в новой локации, должно вызывать `CHANGE_SCENE`.
+2.  **Switch to `NARRATIVE` if:**
+    *   The last enemy in a combat has been defeated, surrendered, or fled.
+    *   A tense situation was resolved peacefully (e.g., successful persuasion).
+    *   The party has disengaged from a threat and is now safe.
 
-3.  **КРИТИЧЕСКИ ВАЖНЫЕ ПРАВИЛА для `CHANGE_SCENE`:**
-    *   **Триггер — перемещение всей группы:** Смена сцены происходит **ТОЛЬКО ТОГДА**, когда **ВСЯ ГРУППА ИГРОКОВ** (или ее фокус) перемещается в новую, отчетливо другую локацию.
-    *   **Что НЕ является сменой сцены:**
-        *   Один игрок заглядывает в соседнюю комнату, пока остальные ждут.
-        *   Персонаж просто перемещается в пределах текущей локации (из одного угла таверны в другой).
-        *   Игроки обсуждают, куда пойти дальше, но физически не перемещаются.
-    *   **Что ЯВЛЯЕТСЯ сменой сцены:**
-        *   Вся группа проходит через дверь в новую комнату.
-        *   Партия выходит из пещеры на открытую местность.
-        *   Герои садятся на корабль, и он отплывает.
-        *   Группа телепортируется.
-    *   **Концепция "Фокуса Группы":** Думай о камере в фильме. Сцена меняется, когда камера следует за главными героями в новое место. Если один разведчик уходит вперед, камера (и сцена) ост��ется с основной группой. Сцена меняется, только когда вся группа следует за разведчиком.
-    *   **Обязательность:** Если условия для смены сцены выполнены, ты **ОБЯЗАН** сгенерировать событие `CHANGE_SCENE`. Это не опционально.
+3.  **Stay in the current mode if:**
+    *   In `COMBAT`, and the action was just another combat action (e.g., attacking the next enemy).
+    *   In `NARRATIVE`, and the action was non-hostile (e.g., continuing a conversation, exploring).
+</PART_1_HEURISTICS_GAME_MODE>
 
-4.  **Ключевое правило:** НЕ ПЕРЕУСЕРДСТВУЙ. Если игрок просто осматривается или говорит что-то незначительное, мир не должен реагировать. **Пустые списки `[]` — это валидный и частый результат.**
+<PART_2_HEURISTICS_WORLD_CHANGES>
+Second, decide on `proactive_world_changes`.
 
-</HEURISTICS_FOR_DECISION>
+1.  **When to create `proactive_world_changes`:**
+    *   **Story Progression:** The player's action met a condition to advance the plot.
+    *   **World State Change:** The action permanently altered the environment (e.g., burning a building, breaking a bridge).
+    *   **Delayed Consequences:** The action will have a future effect (e.g., angering a noble might cause an assassin to be hired later).
+
+    *   **Scene Change (`CHANGE_SCENE`):** This is critical. Use this **every time the entire player group moves to a distinctly new location**.
+        *   **Trigger:** The whole party walks through a door into a new room, leaves a cave, or teleports.
+        *   **Non-Trigger:** One player peeks into another room; the group moves around within the current scene.
+    * **Info being unknown:** If an npc revealed its name or story you should update theit character with `UPDATE_CHARACTER`
+
+2.  **Be Conservative:** Do not overreact. If a player's action is minor, the world should not change. An empty `proactive_world_changes` list (`[]`) is a common and valid output.
+</PART_2_HEURISTICS_WORLD_CHANGES>
 
 <OUTPUT_FORMAT>
-Твой ответ ДОЛЖЕН быть ОДНИМ JSON-объектом, БЕЗ каких-либо дополнительных пояснений или текста до/после него. JSON должен строго соответствовать Pydantic-модели `NarrativeTurnAnalysis`.
--   `reasoning`: Краткое объяснение, почему мир реагирует (или нет).
--   `npc_actions`: Список объектов `NPCTurn`. Заполняй, если NPC действуют немедленно. Внутри `NPCTurn` ��спользуй полную структуру `ActionOutcome` для описания действия NPC.
--   `proactive_world_changes`: Список объектов `ProactiveChange`. Заполняй для сюжетных сдвигов и изменений мира.
+Your response MUST be a SINGLE JSON object, without any additional explanations or text. It must strictly conform to the `AfterActionAnalysis` Pydantic model.
+-   `reasoning`: A brief explanation for your decisions regarding both game mode and world changes.
+-   `recommended_mode`: Your decision, either `COMBAT` or `NARRATIVE`.
+-   `proactive_world_changes`: A list of `ProactiveChange` objects. Leave empty (`[]`) if no changes are needed.
 </OUTPUT_FORMAT>
 
 <MEMORY>
@@ -88,13 +81,15 @@ Here are the last few messages from the DM. Avoid using the same phrases. Be cre
 </MEMORY>
 
 <CONTEXT>
-{chapter.get_actual_context()}
+- **Current Game Mode:** `{chapter.game_mode.name}`
+- **Full Game State:** {chapter.get_actual_context()}
 </CONTEXT>
 
 <TASK>
-Проанализируй действие игрока и текущую обстановку. Сгенерируй JSON-объект `NarrativeTurnAnalysis`, описывающий реакцию мира (учитывай, что на многие действия реакции быть не должно).
+Analyze the context and generate the `AfterActionAnalysis` JSON object.
 </TASK>
 """
+
 
     def get_process_player_input_prompt(self, chapter: 'Chapter', character: Character, user_request: UserRequest, is_NPC: bool = False) -> str:
         
@@ -108,7 +103,7 @@ You are a Dungeon Master's assistant. Your primary role is to interpret player i
 </ROLE>
 
 <PHILOSOPHY_AND_CORE_MECHANICS>
-1.  **Be an Impartial Referee:** Your goal is to be a fair and logical referee of the game world. The outcome of an action should be a logical consequence of the character's choices, their abilities, and the state of the world.
+1.  **Be an Impartial Referee that sometimes can break the 4th wall:** Your goal is to be a fair and logical referee of the game world. The outcome of an action should be a logical consequence of the character's choices, their abilities, and the state of the world.
 
 2.  **Action Economy (Single Action Rule):** By D&D rules, a character can typically perform **one main action** and **one bonus action** per turn. If a player describes an action that implies multiple attacks or steps (e.g., "Я наношу сотню ударов кинжалом" or "Я бегу к врагу, атакую его и отбегаю назад"), you MUST interpret this as a single, stylized main action. For "a hundred stabs," treat it as one "Attack" action. For "run, attack, run back," if the character has the ability, it's one action; if not, it's an illegal sequence.
 
@@ -225,7 +220,7 @@ Generate a JSON object `ActionOutcome` describing the result.
 </GOAL>
 
 <DEFINITIONS>
-- **`COMBAT` (Боевой режим):** С��руктурированный, пошаговый режим. Используется, когда начались активные боевые действия. Время течет дискретно (раунд за раундом). Персонажи совершают действия по очереди.
+- **`COMBAT` (Боевой режим):** Структурированный, пошаговый режим. Используется, когда начались активные боевые действия. Время течет дискретно (раунд за раундом). Персонажи совершают действия по очереди.
 - **`NARRATIVE` (Повествовательный режим):** Свободный режим. Используется для диалогов, исследований, путешествий и решения головоломок. Время течет плавно, и персонажи могут действовать свободно, без строгой очередности.
 </DEFINITIONS>
 

@@ -1,7 +1,6 @@
 # This file makes the 'models' directory a Python package
 # Import core classes for convenient access from other modules
 from .schemas import *
-from .reuqest_types import *
 import pkgutil
 import importlib
 # Автоматически импортируем все модули в папке models (кроме __init__.py)

@@ -1,6 +1,6 @@
 from typing import List
 
-from models.reuqest_types import GameMode
+from models import GameMode
 
 
 class EventBuilder:

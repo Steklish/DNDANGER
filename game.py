@@ -2,8 +2,7 @@ import json
 from chapter_logic import Chapter
 from classifier import Classifier
 from generator import ObjectGenerator
-from models.game_modes import GameMode
-from models.schemas import Character
+from models import *
 from server_communication import *
 from server_communication.events import EventBuilder
 from story_manager import StoryManager
@@ -109,7 +108,7 @@ class Game:
                     await self.make_system_announcement(f"Ход {active_char.name}...")
                     await self.announce_from_the_game(self.chapter.NPC_turn())
                     self.chapter.move_to_next_turn()
-                    await self.announce_from_the_game(self.chapter.after_turn())
+                    # await self.announce_from_the_game(self.chapter.after_turn())
                     await asyncio.sleep(1)
 
             elif self.chapter.game_mode == GameMode.NARRATIVE:
@@ -198,7 +197,7 @@ class Game:
         """
         Asynchronously broadcasts a message to all active listeners.
         """
-        print(f"Broadcasting message to {len(self.listeners)} listeners: {msg}")
+        # print(f"Broadcasting message to {len(self.listeners)} listeners: {msg}")
         tasks = []
         for q in self.listeners:
             # Create an awaitable task for each private announcement
@@ -234,7 +233,7 @@ class Game:
         if was_action and self.chapter.game_mode == GameMode.COMBAT:
             self.chapter.move_to_next_turn()
 
-        await self.announce_from_the_game(self.chapter.after_turn())
+        # await self.announce_from_the_game(self.chapter.after_action())
         print(f"{DEBUG_COLOR}Player {character_name} interaction processed{Colors.RESET}")
         self.turn_completed_event.set()
 

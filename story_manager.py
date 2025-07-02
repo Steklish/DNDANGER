@@ -3,7 +3,7 @@ from models.story_arc import StoryArc, PlotPoint
 from typing import Optional
 from generator import ObjectGenerator
 from prompter import Prompter
-from models.reuqest_types import StoryProgressionCheck
+from models import StoryProgressionCheck
 
 class StoryManager:
     def __init__(self, story_file_path: str):

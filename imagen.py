@@ -56,7 +56,16 @@ class ImageGenerator:
         """Generates an image and schedules the announcement on the main event loop."""
         print(f"{INFO_COLOR}(IMAGEN){Colors.RESET} Starting generation for: {file_name}")
         start_time = time.monotonic()
-        full_prompt = prompt + " Generate an image in a dark fantasy, highly realistic style. Use dark tones. Generate a square image. Generate a single high quality image. Dont use any text in image."
+        full_prompt = f"""
+Epic 1970s dark fantasy paperback book cover art depicting {prompt}.
+The style is a haunting synthesis of Zdzisław Beksiński's dystopian surrealism and the heroic fantasy of Darrell K. Sweet.
+Rendered as a highly detailed oil painting with a gritty, weathered texture.
+The scene is bathed in dramatic chiaroscuro lighting, casting deep, ominous shadows and creating a palpable gothic atmosphere.
+A dark, desaturated color palette dominates, punctuated by a single, eerie light source.
+The composition is theatrical and dynamic, rich with intricate, macabre details.
+
+4k, ultra-detailed, masterpiece. --no text, labels, writing, signatures, watermarks
+"""
         
         try:
             # The SDK call is synchronous, so we run it in a thread to avoid blocking our worker's loop

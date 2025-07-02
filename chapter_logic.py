@@ -1,5 +1,8 @@
-from typing import TYPE_CHECKING
+from calendar import c
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 import inspect
+
+from pydantic import BaseModel
 
 from server_communication.events import EventBuilder
 if TYPE_CHECKING:
@@ -7,21 +10,31 @@ if TYPE_CHECKING:
     
 
 import json
-from dotenv import load_dotenv
 from generator import ObjectGenerator
 from models.game_modes import GameMode
-from models import *
+from models.schemas import (
+    Character, 
+    Scene, 
+    ActionOutcome, 
+    UserRequest, 
+    RequestType, 
+    ChangesToMake, 
+    TurnList, 
+    NextScene,
+    ProactiveChangeType,
+    AfterActionAnalysis
+)
 from server_communication.events import EventBuilder
 from story_manager import StoryManager
 from utils import *
 from global_defines import *
-import global_defines
-from models import *
 from imagen import ImageGenerator
 from classifier import Classifier
 from prompter import Prompter
-from imagen import ImageGenerator
 
+
+class CorrectionList(BaseModel):
+    corrections: List[ChangesToMake]
 
 class Chapter:
     """Fight logic for a chapter in a game, handling character interactions and actions."""
@@ -38,8 +51,8 @@ class Chapter:
         self.turn_order = [char.name for char in self.characters]
         self.current_turn = 0
         self.game_mode = GameMode.NARRATIVE
-        self.prompter = Prompter()
         self.story_manager = story_manager
+        self.prompter = Prompter()
         self.event_log: List[Dict[str, Any]] = []
         self.game = game
         self.image_generator = ImageGenerator(game)
@@ -61,7 +74,7 @@ class Chapter:
             context=context,
             language=self.language
         )
-        self.image_generator.submit_generation_task(new_character.model_dump_json(), new_character.name)
+        self.image_generator.submit_generation_task(new_character.appearance, new_character.name)
         return new_character
          
     def add_character(self, character: Character):
@@ -263,7 +276,7 @@ Your response must be ONLY the complete, updated JSON object for the character. 
                 The campaign is titled '{self.story_manager.story.title}'.
                 The players are starting in a location called '{self.story_manager.story.starting_location}'.
                 The current objective is: '{current_plot.title} - {current_plot.description}'.
-                Based on this, create a compelling and detailed opening scene. Describe the atmosphere, the immediate surroundings, and introduce the initial situation or NPC from the campaign prompt: '{self.story_manager.story.initial_character_prompt}'.
+                Based on this, create a compelling and detailed opening scene.
                 The scene should be mysterious and engaging, drawing the players into the world.
                 """
             else:
@@ -272,24 +285,30 @@ Your response must be ONLY the complete, updated JSON object for the character. 
                 The campaign is titled '{self.story_manager.story.title}'.
                 The players are starting in a location called '{self.story_manager.story.starting_location}'.
                 The initial objective is not clear, so create a scene of arrival with an air of mystery.
-                Introduce the initial situation or NPC from the campaign prompt: '{self.story_manager.story.initial_character_prompt}'.
                 The scene should be mysterious and engaging, drawing the players into the world.
                 """
-            scene_d = self.classifier.generate(prompt, NextScene)
+            scene_d : NextScene = self.classifier.generate(prompt, NextScene) # type: ignore
         elif scene_prompt is None:
-            scene_d = self.classifier.generate(
+            scene_d : NextScene = self.classifier.generate(
                 f"Generate a scene description and difficulty based on the context: {self.context}",
                 NextScene
-            )
+            ) # type: ignore
         else:
-            scene_d = scene_prompt
+            scene_d : NextScene = scene_prompt
 
         self.scene = self.generator.generate(
             pydantic_model=Scene,
-            prompt=str(scene_d),
+            prompt=str(scene_d.scene_description), # type: ignore
             context=self.context,
             language=self.language
         )
+        
+        if scene_d.new_characters:
+            for character in scene_d.new_characters:
+                print(f"(generate_scene) New character {character}")
+                self.add_character(
+                    self.generator.generate(Character, character) 
+                )
 
         print(f"\n{SUCCESS_COLOR}Generated Scene:{Colors.RESET} {ENTITY_COLOR}{self.scene.name}{Colors.RESET}")
         print(f"{INFO_COLOR} Difficulty: {scene_d.scene_difficulty}{Colors.RESET}") # type: ignore
@@ -520,10 +539,7 @@ Provide your response as a single JSON object matching the `UserRequest` model, 
 
         prompt = self.prompter.get_audit_prompt(self, outcome)
 
-        # We expect a list of changes, so we need a wrapper model
-        class CorrectionList(BaseModel):
-            corrections: List[ChangesToMake]
-
+        
         correction_wrapper = self.generator.generate(
             pydantic_model=CorrectionList,
             prompt=prompt,
@@ -577,107 +593,83 @@ Provide your response as a single JSON object matching the `UserRequest` model, 
         return "\n".join(last_n_messages)
     
     
-    async def after_action(self, outcome:ActionOutcome):
-        print("after action processing")
-        prompt = self.prompter.get_turn_analysis_prompt(self, self.game_mode)
-        analisys : TurnAnalysisOutcome = self.generator.generate(
-            pydantic_model=TurnAnalysisOutcome,
-            prompt=prompt,
+    async def after_action(self, outcome: ActionOutcome):
+        """
+        Analyzes the outcome of an action to determine game mode changes and proactive world events.
+        This combines the previous turn analysis and narrative analysis into a single LLM call.
+        """
+        print(f"\n{HEADER_COLOR}Analyzing turn outcome...{Colors.RESET}")
+
+        # 1. Get the combined analysis from the LLM
+        analysis: AfterActionAnalysis = self.generator.generate(
+            pydantic_model=AfterActionAnalysis,
+            prompt=self.prompter.get_after_action_analysis_prompt(self),
             language="Russian"
         )
-        print(f"\n{HEADER_COLOR} Analyzing turn outcome...{Colors.RESET}")
-        print(analisys)
-        if self.game_mode != analisys.recommended_mode:
-            self.game_mode = analisys.recommended_mode
+        print(f"{DEBUG_COLOR}Raw analysis: {analysis.model_dump_json(indent=2)}{Colors.RESET}")
+
+        # 2. Handle Game Mode Change
+        if self.game_mode != analysis.recommended_mode:
+            self.game_mode = analysis.recommended_mode
             yield EventBuilder.alert(f'Game mode changed to <span class="keyword">{self.game_mode.name}</span>', inspect.currentframe().f_code.co_name) # type: ignore
-        yield EventBuilder.end_of_turn()
-    
-    async def after_turn(self):
-        print(f"\n{INFO_COLOR} Processing after-turn effects...{Colors.YELLOW} {len(self.context)} chars of context {Colors.RESET}") # type: ignore
+
+        # 3. Process Proactive World Changes
         if self.game_mode == GameMode.NARRATIVE:
-            async for event in self.after_narrative(): # type: ignore
-                yield event
-        if len(self.context) > MAX_CONTEXT_LENGTH_CHARS:  # type: ignore
-            self.trim_context()
-            if self.context: 
-                print(f"{SUCCESS_COLOR} Context updated{Colors.RESET}")
+            for change in analysis.proactive_world_changes:
+                try:
+                    if not isinstance(change.change_type, ProactiveChangeType):
+                        print(f"{WARNING_COLOR}Skipping invalid change type: {change.change_type}{Colors.RESET}")
+                        continue
 
-    async def after_narrative(self):
-        analisys : NarrativeTurnAnalysis = self.generator.generate(
-            pydantic_model=NarrativeTurnAnalysis,
-            prompt=self.prompter.get_narrative_analysis_prompt(self)
-        )
-        print(f"\n{HEADER_COLOR} Analyzing narrative turn outcome...{Colors.RESET}")
-        print(f"{DEBUG_COLOR}Raw analysis: {analisys}{Colors.RESET}")
-        
-        for i, change in enumerate(analisys.proactive_world_changes, 1):
-            try:
-                if not isinstance(change.change_type, ProactiveChangeType):
-                    print(f"{WARNING_COLOR}Skipping invalid change type: {change.change_type}{Colors.RESET}")
-                    continue
+                    payload = change.payload
+                    change_type = change.change_type
 
-                payload = change.payload
-                match change.change_type:
-                    case ProactiveChangeType.ADD_OBJECT | ProactiveChangeType.UPDATE_OBJECT | ProactiveChangeType.REMOVE_OBJECT | ProactiveChangeType.UPDATE_SCENE:
-                        try:
+                    if change_type in {ProactiveChangeType.ADD_OBJECT, ProactiveChangeType.UPDATE_OBJECT, ProactiveChangeType.REMOVE_OBJECT, ProactiveChangeType.UPDATE_SCENE, ProactiveChangeType.UPDATE_CHARACTER}:
+                        if hasattr(payload, 'object_type') and hasattr(payload, 'object_name') and hasattr(payload, 'changes'):
                             if payload.object_type == "character": # type: ignore
                                 await self.update_character(payload.object_name, payload.changes) # type: ignore
                             elif payload.object_type == "scene": # type: ignore
                                 await self.update_scene(payload.object_name, payload.changes) # type: ignore
                             yield EventBuilder.alert(f"(narrative){payload.object_name}: {payload.changes}", inspect.currentframe().f_code.co_name) # type: ignore
-                        except Exception as e:
-                            yield EventBuilder.error(f"Error processing object change for '{getattr(payload, 'object_name', 'N/A')}': {e}")
-                            print(f"{ERROR_COLOR}Error in object change: {e}{Colors.RESET}")
+                        else:
+                            raise TypeError(f"Invalid payload for {change_type}: {payload}")
 
-                    case ProactiveChangeType.ADD_CHARACTER:
-                        try:
-                            new_character : Character = self.generate_character(change.description, self.context)
-                            self.add_character(new_character)
-                            yield EventBuilder.alert(f"(narrative) A new character, {new_character.name}, appears: {change.description}", inspect.currentframe().f_code.co_name) # type: ignore
-                        except Exception as e:
-                            yield EventBuilder.error(f"Error adding character: {e}")
-                            print(f"{ERROR_COLOR}Error in ADD_CHARACTER: {e}{Colors.RESET}")
+                    elif change_type == ProactiveChangeType.ADD_CHARACTER:
+                        new_char = self.generate_character(change.description, self.context)
+                        self.add_character(new_char)
+                        yield EventBuilder.alert(f"(narrative) A new character, {new_char.name}, appears: {change.description}", inspect.currentframe().f_code.co_name) # type: ignore
 
-                    case ProactiveChangeType.REMOVE_CHARACTER:
-                        try:
-                            if not isinstance(payload, str):
-                                raise TypeError(f"REMOVE_CHARACTER payload must be a string, but got {type(payload)}")
-                            char = self.get_character_by_name(payload)
-                            self.characters.remove(char)
+                    elif change_type == ProactiveChangeType.REMOVE_CHARACTER:
+                        if isinstance(payload, str):
+                            char_to_remove = self.get_character_by_name(payload)
+                            self.characters.remove(char_to_remove)
                             yield EventBuilder.alert(f"(narrative){payload} was removed: {change.description}", inspect.currentframe().f_code.co_name) # type: ignore
-                        except Exception as e:
-                            yield EventBuilder.error(f"Error removing character '{payload}': {e}")
-                            print(f"{ERROR_COLOR}Error in REMOVE_CHARACTER: {e}{Colors.RESET}")
+                        else:
+                            raise TypeError(f"REMOVE_CHARACTER payload must be a string, but got {type(payload)}")
 
-                    case ProactiveChangeType.UPDATE_CHARACTER:
-                        try:
-                            if not hasattr(payload, 'object_name'):
-                                raise TypeError(f"UPDATE_CHARACTER payload is not a valid ChangesToMake object: {payload}")
-                            await self.update_character(payload.object_name, payload.changes) # type: ignore
-                            yield EventBuilder.alert(f"(narrative){payload.object_name} was updated: {change.description}", inspect.currentframe().f_code.co_name) # type: ignore
-                        except Exception as e:
-                            yield EventBuilder.error(f"Error updating character '{getattr(payload, 'object_name', 'N/A')}': {e}")
-                            print(f"{ERROR_COLOR}Error in UPDATE_CHARACTER: {e}{Colors.RESET}")
-
-                    case ProactiveChangeType.CHANGE_SCENE:
-                        try:
-                            if not isinstance(payload, NextScene):
-                                raise TypeError(f"CHANGE_SCENE payload must be a NextScene object, but got {type(payload)}")
+                    elif change_type == ProactiveChangeType.CHANGE_SCENE:
+                        if isinstance(payload, NextScene):
                             self.generate_scene(payload)
-                            # yield EventBuilder.scene_change(change.description)
-                        except Exception as e:
-                            yield EventBuilder.error(f"Error changing scene: {e}")
-                            print(f"{ERROR_COLOR}Error in CHANGE_SCENE: {e}{Colors.RESET}")
-                            
-                    case _:
-                        print(f"{WARNING_COLOR}Unhandled proactive change type: {change.change_type}{Colors.RESET}")
+                        else:
+                            raise TypeError(f"CHANGE_SCENE payload must be a NextScene object, but got {type(payload)}")
+                    
+                    else:
+                        print(f"{WARNING_COLOR}Unhandled proactive change type: {change_type}{Colors.RESET}")
 
-            except Exception as e:
-                yield EventBuilder.error(f"Outer error in after_narrative loop for change '{change.change_type}': {e}")
-                print(f"{ERROR_COLOR}Critical error processing change '{change.change_type}': {e}{Colors.RESET}")
-                # Continue to the next change to avoid a single failure stopping all subsequent changes.
-                continue
-        self.story_manager.check_and_advance(self.context)
+                except Exception as e:
+                    error_message = f"Error processing proactive change '{change.change_type}': {e}"
+                    print(f"{ERROR_COLOR}{error_message}{Colors.RESET}")
+                    yield EventBuilder.error(error_message)
+                    continue
+        
+            self.story_manager.check_and_advance(self.context)
+
+        # 4. End of Turn and Context Trimming
+        yield EventBuilder.end_of_turn()
+        if len(self.context) > MAX_CONTEXT_LENGTH_CHARS:
+            self.trim_context()
+            if self.context:
+                print(f"{SUCCESS_COLOR}Context updated{Colors.RESET}")
 
     async def NPC_turn(self):
         """
